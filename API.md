@@ -8,8 +8,8 @@
 
 按你的部署方式不同，常见基地址如下：
 
-- `http://127.0.0.1:8080`
-- `http://你的公网IP:8080`
+- `http://127.0.0.1:9230`
+- `http://你的公网IP:9230`
 - `https://你的域名`
 
 ### 接口分组
@@ -64,7 +64,7 @@
 请求示例：
 
 ```bash
-curl http://127.0.0.1:8080/api/bootstrap
+curl http://127.0.0.1:9230/api/bootstrap
 ```
 
 成功响应示例：
@@ -101,7 +101,7 @@ curl http://127.0.0.1:8080/api/bootstrap
 cURL 示例：
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/admin/setup \
+curl -X POST http://127.0.0.1:9230/api/admin/setup \
   -H "Content-Type: application/json" \
   -d '{"password":"12345678"}'
 ```
@@ -130,7 +130,7 @@ curl -X POST http://127.0.0.1:8080/api/admin/setup \
 cURL 示例：
 
 ```bash
-curl -c cookie.txt -X POST http://127.0.0.1:8080/api/admin/login \
+curl -c cookie.txt -X POST http://127.0.0.1:9230/api/admin/login \
   -H "Content-Type: application/json" \
   -d '{"password":"12345678"}'
 ```
@@ -144,7 +144,7 @@ curl -c cookie.txt -X POST http://127.0.0.1:8080/api/admin/login \
 cURL 示例：
 
 ```bash
-curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/logout
+curl -b cookie.txt -X POST http://127.0.0.1:9230/api/admin/logout
 ```
 
 ### `GET /api/admin/session`
@@ -154,7 +154,7 @@ curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/logout
 cURL 示例：
 
 ```bash
-curl -b cookie.txt http://127.0.0.1:8080/api/admin/session
+curl -b cookie.txt http://127.0.0.1:9230/api/admin/session
 ```
 
 ## 4. 设备管理接口
@@ -166,7 +166,7 @@ curl -b cookie.txt http://127.0.0.1:8080/api/admin/session
 cURL 示例：
 
 ```bash
-curl -b cookie.txt http://127.0.0.1:8080/api/admin/devices
+curl -b cookie.txt http://127.0.0.1:9230/api/admin/devices
 ```
 
 返回字段包含：
@@ -210,7 +210,7 @@ curl -b cookie.txt http://127.0.0.1:8080/api/admin/devices
 cURL 示例：
 
 ```bash
-curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices \
+curl -b cookie.txt -X POST http://127.0.0.1:9230/api/admin/devices \
   -H "Content-Type: application/json" \
   -d '{"serial":"XM-ABCDE-FGHIJ-KLMNO-PQRST","alias":"卧室时钟"}'
 ```
@@ -244,7 +244,7 @@ curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices \
 cURL 示例：
 
 ```bash
-curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST/alias \
+curl -b cookie.txt -X POST http://127.0.0.1:9230/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST/alias \
   -H "Content-Type: application/json" \
   -d '{"alias":"客厅主钟"}'
 ```
@@ -256,7 +256,7 @@ curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices/XM-ABCDE-FGHI
 cURL 示例：
 
 ```bash
-curl -b cookie.txt -X DELETE http://127.0.0.1:8080/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST
+curl -b cookie.txt -X DELETE http://127.0.0.1:9230/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST
 ```
 
 ## 5. 向设备发送控制命令
@@ -275,7 +275,7 @@ curl -b cookie.txt -X DELETE http://127.0.0.1:8080/api/admin/devices/XM-ABCDE-FG
 cURL 模板：
 
 ```bash
-curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST/commands \
+curl -b cookie.txt -X POST http://127.0.0.1:9230/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST/commands \
   -H "Content-Type: application/json" \
   -d '{"type":"ping","params":{}}'
 ```
@@ -682,7 +682,7 @@ curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices/XM-ABCDE-FGHI
 ### 第一步：设置管理员密码
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/admin/setup \
+curl -X POST http://127.0.0.1:9230/api/admin/setup \
   -H "Content-Type: application/json" \
   -d '{"password":"12345678"}'
 ```
@@ -690,7 +690,7 @@ curl -X POST http://127.0.0.1:8080/api/admin/setup \
 ### 第二步：登录并保存 Cookie
 
 ```bash
-curl -c cookie.txt -X POST http://127.0.0.1:8080/api/admin/login \
+curl -c cookie.txt -X POST http://127.0.0.1:9230/api/admin/login \
   -H "Content-Type: application/json" \
   -d '{"password":"12345678"}'
 ```
@@ -698,7 +698,7 @@ curl -c cookie.txt -X POST http://127.0.0.1:8080/api/admin/login \
 ### 第三步：添加设备
 
 ```bash
-curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices \
+curl -b cookie.txt -X POST http://127.0.0.1:9230/api/admin/devices \
   -H "Content-Type: application/json" \
   -d '{"serial":"XM-ABCDE-FGHIJ-KLMNO-PQRST","alias":"卧室时钟"}'
 ```
@@ -706,7 +706,7 @@ curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices \
 ### 第四步：模拟设备握手
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/device/handshake \
+curl -X POST http://127.0.0.1:9230/api/device/handshake \
   -H "Content-Type: application/json" \
   -d '{"serial":"XM-ABCDE-FGHIJ-KLMNO-PQRST","alias":"XMaoClock-PQRST","firmwareVersion":"Apr 11 2026 14:10:00","mac":"AA:BB:CC:DD:EE:FF","wifiIp":"192.168.1.8","wifiSsid":"MyWiFi"}'
 ```
@@ -714,7 +714,8 @@ curl -X POST http://127.0.0.1:8080/api/device/handshake \
 ### 第五步：给设备发一个 ping 命令
 
 ```bash
-curl -b cookie.txt -X POST http://127.0.0.1:8080/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST/commands \
+curl -b cookie.txt -X POST http://127.0.0.1:9230/api/admin/devices/XM-ABCDE-FGHIJ-KLMNO-PQRST/commands \
   -H "Content-Type: application/json" \
   -d '{"type":"ping","params":{}}'
 ```
+

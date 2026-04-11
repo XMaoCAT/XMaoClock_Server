@@ -62,13 +62,13 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 - 安装 Node.js 20
 - 下载仓库到 `/opt/XMaoClock_Server`
 - 创建并启动 `xmao-remote.service`
-- 默认监听 `8080`
+- 默认监听 `9230`
 - 如果你之前装过，会自动保留 `config.json` 和 `data/store.json`
 
 部署完成后访问：
 
 ```text
-http://你的服务器公网IP:8080
+http://你的服务器公网IP:9230
 ```
 
 ### Windows 一键部署
@@ -84,14 +84,14 @@ powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubus
 - 检测并安装 Node.js LTS
 - 下载仓库到 `C:\XMaoClock_Server`
 - 创建开机自启任务 `XMaoClock Remote Hub`
-- 放行 Windows 防火墙 `8080`
+- 放行 Windows 防火墙 `9230`
 - 如果你之前装过，会自动保留 `config.json` 和 `data\store.json`
 - 立即启动服务
 
 部署完成后访问：
 
 ```text
-http://你的电脑公网IP:8080
+http://你的电脑公网IP:9230
 ```
 
 ### Docker Compose 一键启动
@@ -110,8 +110,8 @@ docker compose up -d --build
 
 按你的部署方式填写：
 
-- 直接暴露 8080 端口：`http://你的公网IP:8080`
-- 绑定域名但没配 HTTPS：`http://你的域名:8080` 或 `http://你的域名`
+- 直接暴露 9230 端口：`http://你的公网IP:9230`
+- 绑定域名但没配 HTTPS：`http://你的域名:9230` 或 `http://你的域名`
 - 做了反向代理并已启用 HTTPS：`https://你的域名`
 
 推荐优先使用：
@@ -129,7 +129,7 @@ https://你的域名
 | 变量名 | 默认值 | 作用 |
 | --- | --- | --- |
 | `HOST` | `0.0.0.0` | 服务监听地址 |
-| `PORT` | `8080` | 服务监听端口 |
+| `PORT` | `9230` | 服务监听端口 |
 | `DEVICE_POLL_INTERVAL_MS` | `8000` | 设备心跳轮询间隔，允许范围 `5000` 到 `60000` |
 | `SESSION_SECRET` | 自动生成 | 后台登录会话密钥，生产环境建议显式设置 |
 
@@ -142,6 +142,24 @@ https://你的域名
 
 - `config.json` 保存端口、主机、会话密钥等配置
 - `data/store.json` 保存管理员密码哈希、设备列表、设备令牌、命令历史
+
+### 如何切换端口
+
+默认端口现在是 `9230`。
+
+如果你想改成别的端口，可以按下面方式改：
+
+- Ubuntu / Linux 手动部署：编辑 `config.json`，把 `"port": 9230` 改成你想要的端口，然后重启服务
+- Windows 手动部署：编辑 `config.json`，把 `"port": 9230` 改成你想要的端口，然后重启进程或计划任务
+- Docker / Docker Compose：编辑 `.env` 里的 `PORT=9230`，改完后重新执行 `docker compose up -d --build`
+- 宝塔 / Nginx / Caddy：如果你把服务改成了别的端口，也要把反向代理目标从 `127.0.0.1:9230` 一起改掉
+
+详细步骤分别写在：
+
+- [README-ubuntu.md](./README-ubuntu.md)
+- [README-windows.md](./README-windows.md)
+- [README-docker.md](./README-docker.md)
+- [README-baota.md](./README-baota.md)
 
 ## 6. 远程控制的完整业务流
 
@@ -233,3 +251,4 @@ data/store.json
 - 构建 Docker 镜像
 
 如果你把这个仓库推到 GitHub，Actions 会自动运行。
+

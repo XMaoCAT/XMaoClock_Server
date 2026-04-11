@@ -72,6 +72,10 @@ if [ -f "$BACKUP_DIR/data/store.json" ]; then
 fi
 $SUDO chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
 
+if [ -f "$INSTALL_DIR/config.json" ]; then
+  "$NODE_BIN" -e "const fs=require('fs');const file=process.argv[1];const data=JSON.parse(fs.readFileSync(file,'utf8'));if(!('port' in data)||Number(data.port)===8080){data.port=9230;fs.writeFileSync(file,JSON.stringify(data,null,2));}" "$INSTALL_DIR/config.json"
+fi
+
 echo "[6/8] 注册 systemd 服务..."
 cat > "$TMP_DIR/${SERVICE_NAME}.service" <<EOF
 [Unit]
@@ -107,9 +111,10 @@ echo "服务状态："
 $SUDO systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,12p'
 echo
 echo "默认访问地址："
-echo "  http://$(hostname -I | awk '{print $1}'):8080"
+echo "  http://$(hostname -I | awk '{print $1}'):9230"
 echo
 echo "下一步："
 echo "1. 浏览器打开后台，首次设置密码"
 echo "2. 添加设备串号"
 echo "3. 回到设备本地网页填写公网 IP 或域名"
+

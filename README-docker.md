@@ -75,7 +75,7 @@ SESSION_SECRET=请换成你自己的长随机字符串
 
 ```env
 HOST=0.0.0.0
-PORT=8080
+PORT=9230
 DEVICE_POLL_INTERVAL_MS=8000
 SESSION_SECRET=please-change-this-to-a-long-random-string
 ```
@@ -96,13 +96,13 @@ docker compose logs -f
 ### 第六步：访问后台
 
 ```text
-http://你的公网IP:8080
+http://你的公网IP:9230
 ```
 
 ### 第七步：开放防火墙
 
 ```bash
-sudo ufw allow 8080/tcp
+sudo ufw allow 9230/tcp
 sudo ufw reload
 ```
 
@@ -152,13 +152,13 @@ docker compose logs -f
 ### 第六步：放行防火墙
 
 ```powershell
-New-NetFirewallRule -DisplayName 'XMaoClock Remote 8080' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8080
+New-NetFirewallRule -DisplayName 'XMaoClock Remote 9230' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9230
 ```
 
 ### 第七步：访问后台
 
 ```text
-http://你的公网IP:8080
+http://你的公网IP:9230
 ```
 
 ## 5. 容器里的数据保存在哪里
@@ -199,7 +199,58 @@ docker compose up -d --build
 docker compose up -d --build
 ```
 
-## 7. 常用 Docker 命令
+## 7. Docker / Compose 如何切换端口
+
+默认端口是 `9230`。如果你要改成别的端口，例如 `9527`，最简单的方式就是改 `.env`。
+
+### 第一步：修改 `.env`
+
+```bash
+nano .env
+```
+
+把：
+
+```env
+PORT=9230
+```
+
+改成：
+
+```env
+PORT=9527
+```
+
+### 第二步：重新构建并启动
+
+```bash
+docker compose up -d --build
+```
+
+### 第三步：如果有防火墙，放行新端口
+
+Ubuntu:
+
+```bash
+sudo ufw allow 9527/tcp
+sudo ufw reload
+```
+
+Windows:
+
+```powershell
+New-NetFirewallRule -DisplayName 'XMaoClock Remote 9527' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9527
+```
+
+### 第四步：设备端地址也要同步
+
+如果你不是通过域名反代，而是让设备直接访问端口，那么设备端地址也要改成：
+
+```text
+http://你的公网IP:9527
+```
+
+## 8. 常用 Docker 命令
 
 启动：
 
@@ -238,7 +289,7 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
-## 8. 域名和 HTTPS
+## 9. 域名和 HTTPS
 
 如果你还想把容器版接到域名和 HTTPS：
 
@@ -250,12 +301,12 @@ docker compose up -d
 - [README-baota.md](./README-baota.md)
 - [deploy/README-HTTPS.md](./deploy/README-HTTPS.md)
 
-## 9. 设备端应该填什么
+## 10. 设备端应该填什么
 
-- 临时测试：`http://公网IP:8080`
+- 临时测试：`http://公网IP:9230`
 - 正式环境：`https://你的域名`
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### `docker compose up -d --build` 后网页打不开
 
@@ -290,3 +341,4 @@ docker compose up -d --build
 docker-compose.yml
 data/store.json
 ```
+

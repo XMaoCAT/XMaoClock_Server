@@ -4,7 +4,7 @@
 
 最适合的理解方式是：
 
-- `XMaoClock Server` 本身是一个 Node.js 服务，实际监听 `127.0.0.1:8080` 或 `0.0.0.0:8080`
+- `XMaoClock Server` 本身是一个 Node.js 服务，实际监听 `127.0.0.1:9230` 或 `0.0.0.0:9230`
 - 宝塔面板负责帮你做域名绑定、反向代理、SSL 证书、图形化管理
 - 物理设备最后填写的是你的公网域名，例如 `https://clock.example.com`
 
@@ -52,10 +52,10 @@ bash install_panel.sh ed8484bec
 8888
 ```
 
-如果你后续要临时直连测试 8080，也请额外放行：
+如果你后续要临时直连测试 9230，也请额外放行：
 
 ```text
-8080
+9230
 ```
 
 ## 3. 第一次进入宝塔面板要做什么
@@ -110,7 +110,7 @@ node server.js
 然后浏览器直接访问：
 
 ```text
-http://你的公网IP:8080
+http://你的公网IP:9230
 ```
 
 如果网页能打开，说明服务正常。
@@ -195,7 +195,7 @@ A 记录：clock.example.com -> 你的服务器公网IP
 新增一条反向代理，建议这样填：
 
 - 代理名称：`xmao-remote`
-- 目标 URL：`http://127.0.0.1:8080`
+- 目标 URL：`http://127.0.0.1:9230`
 - 发送域名：`$host`
 
 保存后，宝塔会帮你把公网访问转发给本机的 Node 服务。
@@ -204,7 +204,7 @@ A 记录：clock.example.com -> 你的服务器公网IP
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:8080;
+    proxy_pass http://127.0.0.1:9230;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -262,7 +262,7 @@ https://clock.example.com
 - `443/tcp`
 - `22/tcp`
 - `8888/tcp`
-- 如果临时调试直连，还可放 `8080/tcp`
+- 如果临时调试直连，还可放 `9230/tcp`
 
 ## 9. 后台和物理设备如何配合
 
@@ -278,7 +278,79 @@ https://clock.example.com
 8. 设备成功握手后，后台就会显示该设备在线状态
 9. 以后你在手机外网打开 `https://你的域名` 登录后台，就能控制设备
 
-## 10. 宝塔环境下如何更新项目
+## 10. 宝塔环境如何切换后台监听端口
+
+如果你要把后台服务从默认的 `9230` 改成别的端口，例如 `9527`，要同时改服务配置和反向代理目标。
+
+### 第一步：修改服务配置
+
+SSH 登录服务器后执行：
+
+```bash
+sudo nano /opt/XMaoClock_Server/config.json
+```
+
+把：
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 9230
+}
+```
+
+改成：
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 9527
+}
+```
+
+保存后重启服务：
+
+```bash
+sudo systemctl restart xmao-remote
+sudo systemctl status xmao-remote --no-pager
+```
+
+### 第二步：修改宝塔反向代理目标
+
+进入：
+
+```text
+网站 -> 你的站点 -> 设置 -> 反向代理
+```
+
+把目标 URL 从：
+
+```text
+http://127.0.0.1:9230
+```
+
+改成：
+
+```text
+http://127.0.0.1:9527
+```
+
+### 第三步：如果你直连端口调试，也要放行新端口
+
+```bash
+sudo ufw allow 9527/tcp
+sudo ufw reload
+```
+
+### 第四步：如果设备不是通过域名访问，而是直连端口
+
+那设备端也要改成：
+
+```text
+http://你的公网IP:9527
+```
+
+## 11. 宝塔环境下如何更新项目
 
 SSH 登录服务器后执行：
 
@@ -297,7 +369,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 
 脚本会保留 `config.json` 与 `data/store.json`。
 
-## 11. 常见问题
+## 12. 常见问题
 
 ### 宝塔里网站能打开，但页面显示 502 / 504
 
@@ -328,9 +400,10 @@ sudo journalctl -u xmao-remote -f
 - [README-ubuntu.md](./README-ubuntu.md)
 - [README-docker.md](./README-docker.md)
 
-## 12. 官方参考页面
+## 13. 官方参考页面
 
 为了和宝塔当前界面保持一致，你也可以对照官方文档：
 
 - 安装宝塔面板：`https://docs.bt.cn/10.0/getting-started/quick-installation-of-bt-panel`
 - 创建站点：`https://docs.bt.cn/getting-started/create-web`
+

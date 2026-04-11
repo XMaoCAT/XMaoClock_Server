@@ -168,7 +168,7 @@ function sanitizeDevice(device) {
 function createDefaultConfig() {
   return {
     host: '0.0.0.0',
-    port: 8080,
+    port: 9230,
     sessionSecret: crypto.randomBytes(32).toString('hex'),
     devicePollIntervalMs: 8000
   };
@@ -1029,3 +1029,4 @@ server.listen(config.port, config.host, () => {
   console.log(`[RemotePlatform] Open http://127.0.0.1:${config.port} on this server to complete setup`);
   console.log(`[RemotePlatform] Listening on ${config.host}:${config.port}`);
 });
+

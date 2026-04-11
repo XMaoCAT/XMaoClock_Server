@@ -74,6 +74,15 @@ if (Test-Path (Join-Path $BackupDir 'data\store.json')) {
 
 $NodePath = (Get-Command node).Source
 
+$ConfigPath = Join-Path $InstallDir 'config.json'
+if (Test-Path $ConfigPath) {
+    $Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+    if (-not $Config.port -or [int]$Config.port -eq 8080) {
+        $Config.port = 9230
+        $Config | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigPath -Encoding utf8
+    }
+}
+
 Write-Host '[6/8] 注册开机自启任务 ...'
 try {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
@@ -84,9 +93,12 @@ $Trigger = New-ScheduledTaskTrigger -AtStartup
 $Principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Force | Out-Null
 
-Write-Host '[7/8] 放行防火墙 8080 端口 ...'
-if (-not (Get-NetFirewallRule -DisplayName 'XMaoClock Remote 8080' -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName 'XMaoClock Remote 8080' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8080 | Out-Null
+Write-Host '[7/8] 放行防火墙 9230 端口 ...'
+if (Get-NetFirewallRule -DisplayName 'XMaoClock Remote 8080' -ErrorAction SilentlyContinue) {
+    Remove-NetFirewallRule -DisplayName 'XMaoClock Remote 8080' | Out-Null
+}
+if (-not (Get-NetFirewallRule -DisplayName 'XMaoClock Remote 9230' -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName 'XMaoClock Remote 9230' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9230 | Out-Null
 }
 
 Write-Host '[8/8] 启动服务进程 ...'
@@ -110,10 +122,11 @@ if ($PreservedConfig -or $PreservedStore) {
 }
 Write-Host "安装目录：$InstallDir"
 Write-Host '默认访问地址：'
-Write-Host '  http://127.0.0.1:8080'
-Write-Host '  http://你的公网IP:8080'
+Write-Host '  http://127.0.0.1:9230'
+Write-Host '  http://你的公网IP:9230'
 Write-Host ''
 Write-Host '下一步：'
 Write-Host '1. 浏览器打开后台，首次设置密码'
 Write-Host '2. 添加设备串号'
 Write-Host '3. 回到设备本地网页填写公网 IP 或域名'
+

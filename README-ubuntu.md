@@ -39,7 +39,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 执行完后，先试着访问：
 
 ```text
-http://你的公网IP:8080
+http://你的公网IP:9230
 ```
 
 ## 3. 手动部署全流程
@@ -116,14 +116,14 @@ node server.js
 
 ```text
 [RemotePlatform] XMaoClock remote control platform started
-[RemotePlatform] Open http://127.0.0.1:8080 on this server to complete setup
-[RemotePlatform] Listening on 0.0.0.0:8080
+[RemotePlatform] Open http://127.0.0.1:9230 on this server to complete setup
+[RemotePlatform] Listening on 0.0.0.0:9230
 ```
 
 这时先不要关闭 SSH 窗口，另外打开浏览器访问：
 
 ```text
-http://你的服务器公网IP:8080
+http://你的服务器公网IP:9230
 ```
 
 如果网页能打开，说明程序正常。
@@ -205,10 +205,10 @@ sudo journalctl -u xmao-remote -f
 
 ## 5. 打开防火墙端口
 
-### 如果你直接暴露 8080
+### 如果你直接暴露 9230
 
 ```bash
-sudo ufw allow 8080/tcp
+sudo ufw allow 9230/tcp
 sudo ufw reload
 sudo ufw status
 ```
@@ -229,7 +229,7 @@ sudo ufw status
 浏览器访问：
 
 ```text
-http://你的公网IP:8080
+http://你的公网IP:9230
 ```
 
 第一次打开时，按下面顺序做：
@@ -243,7 +243,94 @@ http://你的公网IP:8080
 7. 在设备串号下方输入服务器公网 IP 或域名。
 8. 设备握手成功后，后台就能显示在线状态。
 
-## 7. 域名和 HTTPS
+## 7. Ubuntu 如何切换监听端口
+
+默认端口是 `9230`。如果你想改成例如 `9527`、`9000`、`12345`，按下面步骤做。
+
+### 方法一：直接修改 `config.json`
+
+编辑配置文件：
+
+```bash
+sudo nano /opt/XMaoClock_Server/config.json
+```
+
+把里面的：
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 9230
+}
+```
+
+改成你想要的端口，例如：
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 9527
+}
+```
+
+保存后重启服务：
+
+```bash
+sudo systemctl restart xmao-remote
+sudo systemctl status xmao-remote --no-pager
+```
+
+### 方法二：临时使用环境变量覆盖
+
+如果你只是临时测试，也可以直接前台运行：
+
+```bash
+cd /opt/XMaoClock_Server
+PORT=9527 node server.js
+```
+
+但这种方式只适合测试，长期运行还是推荐改 `config.json`。
+
+### 改端口后别忘了同步这几处
+
+1. 放行新的防火墙端口：
+
+```bash
+sudo ufw allow 9527/tcp
+sudo ufw reload
+```
+
+2. 如果你在用 Nginx 反代，把：
+
+```nginx
+proxy_pass http://127.0.0.1:9230;
+```
+
+改成：
+
+```nginx
+proxy_pass http://127.0.0.1:9527;
+```
+
+3. 如果你在用 Caddy，把：
+
+```caddyfile
+reverse_proxy 127.0.0.1:9230
+```
+
+改成：
+
+```caddyfile
+reverse_proxy 127.0.0.1:9527
+```
+
+4. 如果你不是用域名反代，而是让设备直连端口，那设备端也要改成新的地址，例如：
+
+```text
+http://你的公网IP:9527
+```
+
+## 8. 域名和 HTTPS
 
 如果你已经有域名，比如：
 
@@ -286,7 +373,7 @@ server {
     client_max_body_size 4m;
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:9230;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -333,7 +420,7 @@ sudo nano /etc/caddy/Caddyfile
 
 ```caddyfile
 clock.example.com {
-    reverse_proxy 127.0.0.1:8080
+    reverse_proxy 127.0.0.1:9230
 }
 ```
 
@@ -356,15 +443,15 @@ https://clock.example.com
 https://clock.example.com
 ```
 
-## 8. 推荐给设备填写的地址
+## 9. 推荐给设备填写的地址
 
 推荐顺序如下：
 
 1. 最好：`https://你的域名`
 2. 次优：`http://你的域名`
-3. 临时测试：`http://你的公网IP:8080`
+3. 临时测试：`http://你的公网IP:9230`
 
-## 9. 升级平台
+## 10. 升级平台
 
 ### 如果你是 Git 部署
 
@@ -382,7 +469,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 
 脚本会保留旧的 `config.json` 与 `data/store.json`。
 
-## 10. 备份与重置
+## 11. 备份与重置
 
 ### 备份
 
@@ -402,16 +489,16 @@ rm -f /opt/XMaoClock_Server/data/store.json
 sudo systemctl start xmao-remote
 ```
 
-## 11. 常见问题
+## 12. 常见问题
 
-### 浏览器打不开 `http://公网IP:8080`
+### 浏览器打不开 `http://公网IP:9230`
 
 依次检查：
 
 1. `sudo systemctl status xmao-remote --no-pager`
 2. `sudo ufw status`
-3. 云服务器安全组是否放行 8080
-4. `curl http://127.0.0.1:8080/api/bootstrap`
+3. 云服务器安全组是否放行 9230
+4. `curl http://127.0.0.1:9230/api/bootstrap`
 
 ### 本地浏览器能打开，但设备握手失败
 
@@ -422,6 +509,7 @@ sudo systemctl start xmao-remote
 3. 如果用了域名，域名是否解析到了正确公网 IP
 4. 如果用了 HTTPS，证书是否已正常签发
 
-### 想只通过域名访问，不带 `:8080`
+### 想只通过域名访问，不带 `:9230`
 
 请使用上面的 Nginx 或 Caddy 反向代理方案。
+
