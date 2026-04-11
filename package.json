@@ -1,0 +1,13 @@
+{
+  "name": "xmaoclock-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "XMaoClock public remote control server for Windows and Ubuntu",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

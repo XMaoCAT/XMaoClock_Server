@@ -1,0 +1,14 @@
+[Unit]
+Description=XMaoClock Remote Hub
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/XMaoClock_Server
+ExecStart=/usr/bin/node /opt/XMaoClock_Server/server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

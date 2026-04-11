@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XMaoClock Remote Hub</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">XMaoClock Remote Hub</div>
+        <h1>多设备公网管理平台</h1>
+        <p>先在这里录入设备串号，再去设备本地网页填写公网域名或 IP。握手成功后，公网后台就能查看在线状态并远程控制闹钟、画板、RGB、引脚和联网后热点广播。</p>
+      </div>
+      <div class="hero-side">
+        <div class="hero-stat">
+          <span class="stat-label">当前状态</span>
+          <strong id="server-state">初始化中</strong>
+        </div>
+        <div class="theme-switch">
+          <button class="ghost-btn active" data-theme-choice="dark" type="button">深色后台</button>
+          <button class="ghost-btn" data-theme-choice="light" type="button">浅色后台</button>
+        </div>
+        <button class="ghost-btn hidden" id="logout-btn" type="button">退出登录</button>
+      </div>
+    </header>
+
+    <main class="dashboard-grid">
+      <section class="panel auth-panel" id="setup-panel">
+        <h2>首次初始化</h2>
+        <p>第一次打开平台时，请先设置后台登录密码。</p>
+        <form id="setup-form" class="stack-form">
+          <label>
+            <span>管理员密码</span>
+            <input id="setup-password" type="password" minlength="6" placeholder="至少 6 位">
+          </label>
+          <button class="primary-btn" type="submit">保存密码</button>
+        </form>
+      </section>
+
+      <section class="panel auth-panel hidden" id="login-panel">
+        <h2>后台登录</h2>
+        <p>部署完成后，每次都从这里登录进入多设备管理页。</p>
+        <form id="login-form" class="stack-form">
+          <label>
+            <span>管理员密码</span>
+            <input id="login-password" type="password" placeholder="输入后台密码">
+          </label>
+          <button class="primary-btn" type="submit">登录平台</button>
+        </form>
+      </section>
+
+      <section class="panel hidden" id="dashboard-panel">
+        <div class="panel-head split-head">
+          <div>
+            <h2>设备绑定</h2>
+            <p>添加设备串号后，物理设备端填写公网地址即可握手。每个设备展开后就是完整的远程控制台。</p>
+          </div>
+          <div class="mini-stats">
+            <div><span>设备总数</span><strong id="device-count">0</strong></div>
+            <div><span>在线设备</span><strong id="online-count">0</strong></div>
+          </div>
+        </div>
+
+        <form id="device-form" class="device-form">
+          <label>
+            <span>设备串号</span>
+            <input id="device-serial" type="text" placeholder="例如 XM-ABCDE-FGHIJ-KLMNO-PQRST">
+          </label>
+          <label>
+            <span>备注名称</span>
+            <input id="device-alias" type="text" placeholder="例如 卧室时钟">
+          </label>
+          <button class="primary-btn" type="submit">添加设备</button>
+        </form>
+
+        <div class="hint-box">典型流程：1. 在此添加设备串号 2. 在设备内网页面输入公网地址 3. 设备握手成功后自动上线 4. 手机外网登录此页控制设备。</div>
+        <div class="device-grid" id="device-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <template id="device-card-template"><div></div></template>
+  <div class="toast" id="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
