@@ -124,8 +124,18 @@ input:focus, select:focus {
 .primary-btn { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%); font-weight: 700; }
 .secondary-btn { background: rgba(102, 194, 255, 0.12); border: 1px solid rgba(102, 194, 255, 0.18); font-weight: 700; }
 .ghost-btn, .chip-btn, .tool-chip { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); }
+.danger-ghost-btn {
+  border: 1px solid rgba(255, 159, 139, 0.28);
+  background: rgba(255, 159, 139, 0.12);
+  color: var(--danger);
+  border-radius: 16px;
+  padding: 12px 16px;
+  font-weight: 700;
+  transition: transform 240ms cubic-bezier(0.25, 1, 0.5, 1), opacity 200ms cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform, opacity;
+}
 .danger-btn { background: linear-gradient(135deg, #ffad96 0%, #ef6f64 100%); }
-.primary-btn:hover, .secondary-btn:hover, .ghost-btn:hover, .chip-btn:hover, .tool-chip:hover, .device-card-head:hover { transform: translate3d(0, -2px, 0); opacity: 0.94; }
+.primary-btn:hover, .secondary-btn:hover, .ghost-btn:hover, .chip-btn:hover, .tool-chip:hover, .danger-ghost-btn:hover, .device-card-head:hover { transform: translate3d(0, -2px, 0); opacity: 0.94; }
 .theme-switch .active, .tool-chip.active { border-color: var(--line-strong); background: rgba(102, 194, 255, 0.16); }
 .split-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; }
 .split-head p { margin: 8px 0 0; color: var(--muted); }
@@ -203,6 +213,7 @@ input:focus, select:focus {
   margin-bottom: 16px;
 }
 .section-head p, .device-section p, .sub-card h5 + div { margin: 6px 0 0; color: var(--muted); }
+.history-tip { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
 .inline-form { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
 .action-grid { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .pin-card-grid { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }

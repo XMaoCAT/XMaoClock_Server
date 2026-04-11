@@ -229,10 +229,10 @@ https://clock.example.com
 
 ## 7. 如果你已经部署过旧版本
 
-可以直接再次运行：
+推荐直接运行无痛更新命令：
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-baota.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/update-baota.sh)"
 ```
 
 脚本会保留：

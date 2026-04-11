@@ -122,6 +122,14 @@ function bootAnimationName(type) {
   return Number(type) === 2 ? 'V6.0 酱炫版' : '经典版';
 }
 
+function commandStatusLabel(status) {
+  if (status === 'queued') return '等待投递';
+  if (status === 'sent') return '等待设备回执';
+  if (status === 'success') return '执行成功';
+  if (status === 'error') return '执行失败';
+  return status || '未知状态';
+}
+
 function rgbHex(rgb) {
   const toHex = value => clamp(value, 0, 255).toString(16).padStart(2, '0');
   return `#${toHex(rgb && rgb.r)}${toHex(rgb && rgb.g)}${toHex(rgb && rgb.b)}`;
@@ -131,9 +139,9 @@ function renderHistory(history) {
   if (!history || history.length === 0) return '<div class="history-empty">还没有命令记录。</div>';
   return history.map(item => `
     <div class="history-item ${escapeHtml(item.status || '')}">
-      <strong>${escapeHtml(item.type || 'unknown')} · ${escapeHtml(item.status || 'queued')}</strong>
+      <strong>${escapeHtml(item.type || 'unknown')} · ${escapeHtml(commandStatusLabel(item.status || 'queued'))}</strong>
       <div>${escapeHtml(item.resultMessage || '等待设备执行或回报结果')}</div>
-      <small>创建时间: ${escapeHtml(item.createdAt || '--')}${item.executedAt ? ` · 执行时间: ${escapeHtml(item.executedAt)}` : ''}</small>
+      <small>创建时间: ${escapeHtml(item.createdAt || '--')}${item.dispatchedAt ? ` · 最近投递: ${escapeHtml(item.dispatchedAt)}` : ''}${item.executedAt ? ` · 执行时间: ${escapeHtml(item.executedAt)}` : ''}</small>
     </div>
   `).join('');
 }
@@ -182,6 +190,7 @@ function createDeviceCardMarkup(device) {
     makeInfoTile('固件版本', device.firmwareVersion || '--'),
     makeInfoTile('计划闹钟', String((device.scheduledAlarms || []).length)),
     makeInfoTile('活跃闹钟', String((device.activeAlarms || []).length)),
+    makeInfoTile('待确认命令', String(device.pendingQueueCount || 0), Number(device.pendingQueueCount || 0) > 0),
     makeInfoTile('RGB 状态', rgb.spectrum ? '光谱模式' : `${currentColor.toUpperCase()} · ${rgb.brightness}%`),
     makeInfoTile('显示风格', `${bootAnimationName(device.bootAnimationType)}${device.canvasDisplayActive ? ' · 画板显示中' : ''}`)
   ].join('');
@@ -205,7 +214,7 @@ function createDeviceCardMarkup(device) {
         <div class="device-info-grid">${infoTiles}</div>
         <div class="device-sections">
           <section class="device-section span-2">
-            <div class="section-head"><div><h4>基础操作</h4><p>重命名、时间同步、重启与联网后热点广播都在这里。</p></div></div>
+            <div class="section-head"><div><h4>基础操作</h4><p>重命名、时间同步、重启、删除设备与联网后热点广播都在这里。</p></div><button class="danger-ghost-btn delete-device-btn" type="button">删除设备</button></div>
             <form class="rename-form inline-form"><label><span>重命名</span><input class="rename-input" type="text" value="${escapeHtml(device.alias || '')}" placeholder="修改这个设备的备注名称"></label><button class="secondary-btn" type="submit">保存备注</button></form>
             <div class="action-grid">
               <button class="secondary-btn command-btn" data-type="ping" type="button">在线探测</button>
@@ -253,7 +262,7 @@ function createDeviceCardMarkup(device) {
             <div class="preset-row"><button class="chip-btn rgb-preset-btn" type="button" data-color="red">红</button><button class="chip-btn rgb-preset-btn" type="button" data-color="green">绿</button><button class="chip-btn rgb-preset-btn" type="button" data-color="blue">蓝</button><button class="chip-btn rgb-off-btn" type="button">关闭</button></div>
           </section>
           <section class="device-section span-2"><div class="section-head"><div><h4>GPIO 远控</h4><p>通过公网后台直接触发 /Start、/Open、/Close。</p></div></div>${renderPinCards()}</section>
-          <section class="device-section span-2 history-box section-history"><div class="history-head"><h4>最近命令记录</h4><button class="ghost-btn delete-device-btn" type="button">删除绑定</button></div><div class="history-list">${renderHistory(device.commandHistory)}</div></section>
+          <section class="device-section span-2 history-box section-history"><div class="history-head"><h4>最近命令记录</h4><span class="history-tip">命令会保留在队列里，直到设备真正回执成功或失败。</span></div><div class="history-list">${renderHistory(device.commandHistory)}</div></section>
         </div>
       </div>
     </article>

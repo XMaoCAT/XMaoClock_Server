@@ -12,6 +12,7 @@ const STORE_FILE = path.join(DATA_DIR, 'store.json');
 const ONLINE_WINDOW_MS = 20000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_HISTORY = 60;
+const COMMAND_RETRY_WINDOW_MS = 15000;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -351,6 +352,11 @@ function getOrCreateDevice(serial, alias) {
   device.bootAnimationType = clamp(device.bootAnimationType, 1, 2, 1);
   device.canvasDisplayActive = !!device.canvasDisplayActive;
   device.canvasDisplayDuration = clamp(device.canvasDisplayDuration, 0, 86400, 0);
+  device.pendingQueue = Array.isArray(device.pendingQueue)
+    ? device.pendingQueue.map(id => String(id || '').trim()).filter(Boolean)
+    : [];
+  device.commandHistory = Array.isArray(device.commandHistory) ? device.commandHistory.slice(0, MAX_HISTORY) : [];
+  cleanupPendingQueue(device);
   return device;
 }
 
@@ -378,6 +384,72 @@ function queueCommand(device, type, params = {}) {
 
 function findCommand(device, commandId) {
   return (device.commandHistory || []).find(item => item.id === commandId) || null;
+}
+
+function cleanupPendingQueue(device) {
+  const nextQueue = [];
+  const seen = new Set();
+
+  (Array.isArray(device.pendingQueue) ? device.pendingQueue : []).forEach(id => {
+    const commandId = String(id || '').trim();
+    if (!commandId || seen.has(commandId)) {
+      return;
+    }
+
+    const command = findCommand(device, commandId);
+    if (!command) {
+      return;
+    }
+
+    if (command.status === 'success' || command.status === 'error') {
+      return;
+    }
+
+    seen.add(commandId);
+    nextQueue.push(commandId);
+  });
+
+  device.pendingQueue = nextQueue;
+  return nextQueue;
+}
+
+function shouldDispatchCommand(command) {
+  if (!command) {
+    return false;
+  }
+
+  if (command.status === 'queued') {
+    return true;
+  }
+
+  if (command.status !== 'sent') {
+    return false;
+  }
+
+  const dispatchedAtMs = command.dispatchedAt ? Date.parse(command.dispatchedAt) : 0;
+  if (!Number.isFinite(dispatchedAtMs) || !dispatchedAtMs) {
+    return true;
+  }
+
+  return (Date.now() - dispatchedAtMs) >= COMMAND_RETRY_WINDOW_MS;
+}
+
+function buildDispatchCommands(device) {
+  const dispatchedAt = nowIso();
+
+  return cleanupPendingQueue(device)
+    .map(id => findCommand(device, id))
+    .filter(shouldDispatchCommand)
+    .map(command => {
+      command.status = 'sent';
+      command.dispatchedAt = dispatchedAt;
+      command.deliveryAttempts = Number(command.deliveryAttempts || 0) + 1;
+      return {
+        id: command.id,
+        type: command.type,
+        params: command.params || {}
+      };
+    });
 }
 
 function parseResultsInput(input) {
@@ -416,10 +488,12 @@ function applyCommandResults(device, resultsInput) {
     target.status = result.success ? 'success' : 'error';
     target.resultMessage = String(result.message || '');
     target.executedAt = nowIso();
+    device.pendingQueue = (Array.isArray(device.pendingQueue) ? device.pendingQueue : []).filter(id => id !== commandId);
     touched = true;
   });
 
   if (touched) {
+    cleanupPendingQueue(device);
     saveStore();
   }
 }
@@ -863,21 +937,7 @@ async function handleDeviceHeartbeat(req, res) {
   applyCommandResults(device, body.pendingResultsJson || body.pendingResults || []);
   updateDeviceHeartbeat(device, body);
 
-  const pendingIds = Array.isArray(device.pendingQueue) ? device.pendingQueue.slice() : [];
-  const commands = pendingIds
-    .map(id => findCommand(device, id))
-    .filter(Boolean)
-    .map(command => {
-      command.status = 'sent';
-      command.dispatchedAt = nowIso();
-      return {
-        id: command.id,
-        type: command.type,
-        params: command.params || {}
-      };
-    });
-
-  device.pendingQueue = [];
+  const commands = buildDispatchCommands(device);
   saveStore();
 
   sendJson(res, 200, {

@@ -182,6 +182,16 @@ data/store.json
 
 ## 6. 更新平台
 
+推荐直接用下面这条无痛更新命令：
+
+```bash
+cd XMaoClock_Server
+docker compose pull
+docker compose up -d --build
+```
+
+只要你的 `.env` 和 `data/store.json` 还在，这次更新就不会丢后台密码、设备列表和大部分运行数据。
+
 如果你已经是 Git 克隆方式：
 
 ```bash

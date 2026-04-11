@@ -124,6 +124,47 @@ docker compose up -d --build
 
 详细容器化说明见：[README-docker.md](./README-docker.md)
 
+## 3.1 无痛更新命令
+
+下面这些命令都会保留：
+
+- `config.json`
+- `data/store.json`
+
+也就是说：
+
+- 后台密码不会丢
+- 已绑定设备不会丢
+- 命令历史和大部分运行数据不会丢
+
+### Linux / Ubuntu / Debian / CentOS / AlmaLinux / Rocky
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/update-linux.sh)"
+```
+
+### 已有宝塔环境
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/update-baota.sh)"
+```
+
+### Windows
+
+以管理员身份打开 PowerShell：
+
+```powershell
+powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/update-windows.ps1 | iex"
+```
+
+### Docker / Docker Compose
+
+```bash
+cd XMaoClock_Server
+docker compose pull
+docker compose up -d --build
+```
+
 ## 4. 设备端应该填写什么地址
 
 按你的部署方式填写：

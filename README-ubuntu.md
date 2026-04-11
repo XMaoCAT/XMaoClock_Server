@@ -461,13 +461,13 @@ git pull
 sudo systemctl restart xmao-remote
 ```
 
-### 如果你是重新执行一键脚本
+### 推荐：无痛更新命令
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-ubuntu.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/update-linux.sh)"
 ```
 
-脚本会保留旧的 `config.json` 与 `data/store.json`。
+这个命令会自动拉取最新网页与服务端代码，并保留旧的 `config.json` 与 `data/store.json`。
 
 ## 11. 备份与重置
 
