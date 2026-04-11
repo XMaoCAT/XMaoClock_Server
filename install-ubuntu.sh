@@ -18,9 +18,12 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 TMP_DIR="$(mktemp -d)"
+BACKUP_DIR="$TMP_DIR/backup"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo "[1/7] 安装系统依赖..."
+mkdir -p "$BACKUP_DIR/data"
+
+echo "[1/8] 安装系统依赖..."
 $SUDO apt update
 $SUDO apt install -y curl ca-certificates unzip git
 
@@ -35,26 +38,41 @@ else
 fi
 
 if [ "$NEED_NODE_INSTALL" = "true" ]; then
-  echo "[2/7] 安装 Node.js 20..."
+  echo "[2/8] 安装 Node.js 20..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
   $SUDO apt install -y nodejs
 else
-  echo "[2/7] Node.js 已存在，跳过安装..."
+  echo "[2/8] Node.js 已存在，跳过安装..."
 fi
 
 NODE_BIN="$(command -v node)"
-echo "[3/7] 下载仓库源码..."
+
+echo "[3/8] 下载仓库源码..."
 curl -fsSL "$REPO_ZIP_URL" -o "$TMP_DIR/repo.zip"
 unzip -q "$TMP_DIR/repo.zip" -d "$TMP_DIR"
 
-echo "[4/7] 写入安装目录 $INSTALL_DIR ..."
+echo "[4/8] 备份现有配置和数据..."
+if [ -f "$INSTALL_DIR/config.json" ]; then
+  $SUDO cp "$INSTALL_DIR/config.json" "$BACKUP_DIR/config.json"
+fi
+if [ -f "$INSTALL_DIR/data/store.json" ]; then
+  $SUDO cp "$INSTALL_DIR/data/store.json" "$BACKUP_DIR/data/store.json"
+fi
+
+echo "[5/8] 写入安装目录 $INSTALL_DIR ..."
 $SUDO rm -rf "$INSTALL_DIR"
 $SUDO mkdir -p "$INSTALL_DIR"
 $SUDO cp -r "$TMP_DIR/XMaoClock_Server-main/." "$INSTALL_DIR/"
 $SUDO mkdir -p "$INSTALL_DIR/data"
+if [ -f "$BACKUP_DIR/config.json" ]; then
+  $SUDO cp "$BACKUP_DIR/config.json" "$INSTALL_DIR/config.json"
+fi
+if [ -f "$BACKUP_DIR/data/store.json" ]; then
+  $SUDO cp "$BACKUP_DIR/data/store.json" "$INSTALL_DIR/data/store.json"
+fi
 $SUDO chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
 
-echo "[5/7] 注册 systemd 服务..."
+echo "[6/8] 注册 systemd 服务..."
 cat > "$TMP_DIR/${SERVICE_NAME}.service" <<EOF
 [Unit]
 Description=XMaoClock Remote Hub
@@ -76,11 +94,15 @@ $SUDO cp "$TMP_DIR/${SERVICE_NAME}.service" "$SERVICE_FILE"
 $SUDO systemctl daemon-reload
 $SUDO systemctl enable "$SERVICE_NAME"
 
-echo "[6/7] 启动服务..."
+echo "[7/8] 启动服务..."
 $SUDO systemctl restart "$SERVICE_NAME"
 
-echo "[7/7] 完成。"
+echo "[8/8] 完成。"
 echo
+if [ -f "$BACKUP_DIR/config.json" ] || [ -f "$BACKUP_DIR/data/store.json" ]; then
+  echo "已保留原有 config.json 与 data/store.json。"
+  echo
+fi
 echo "服务状态："
 $SUDO systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,12p'
 echo

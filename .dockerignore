@@ -1,0 +1,8 @@
+.git
+.gitignore
+.github
+config.json
+data/store.json
+node_modules
+npm-debug.log*
+*.log

@@ -1,143 +1,310 @@
 # XMaoClock Remote Hub Windows 部署说明
 
-这份说明适合 Windows 10 / 11 服务器或带公网 IP 的电脑。
+这份文档适合 Windows 10 / 11、Windows Server，或者家里一台带公网映射能力的 Windows 电脑。
 
-## 0. 一键部署
+如果你只想先跑起来，可以直接使用一键部署脚本。下面我把完整命令也都写出来，方便你一步一步照做。
 
-以管理员身份打开 PowerShell，直接执行：
+## 1. 开始前需要准备什么
+
+你至少需要：
+
+- 一台 Windows 10 / 11 或 Windows Server
+- 这台机器能访问外网
+- 你有管理员权限
+- 如果要外网直连，需要公网 IP、端口映射，或者把域名解析到这台机器
+- 如果你想走 HTTPS，建议配合 Caddy
+
+## 2. 一键部署
+
+以管理员身份打开 PowerShell，然后执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-windows.ps1 | iex"
 ```
 
-脚本默认会把平台安装到：
+脚本会自动：
+
+- 安装 Node.js LTS
+- 下载仓库到 `C:\XMaoClock_Server`
+- 创建开机自启任务 `XMaoClock Remote Hub`
+- 开放 Windows 防火墙 `8080`
+- 启动服务
+- 保留旧的 `config.json` 与 `data\store.json`
+
+执行完成后访问：
 
 ```text
-C:\XMaoClock_Server
+http://你的公网IP:8080
 ```
 
-下面是手动部署版。
+## 3. 手动部署全流程
 
-## 1. 安装 Node.js
+### 第一步：安装 Node.js
 
-前往 Node.js 官网安装 18 或更新版本。
+#### 方式 A：使用 winget 安装
 
-安装完成后打开 PowerShell：
+以管理员身份打开 PowerShell，执行：
+
+```powershell
+winget install -e --id OpenJS.NodeJS.LTS
+```
+
+安装后关闭 PowerShell 再重新打开，然后验证：
+
+```powershell
+node -v
+npm -v
+```
+
+#### 方式 B：手动下载安装包
+
+也可以去 Node.js 官网下载 LTS 安装包，安装后再运行：
 
 ```powershell
 node -v
 ```
 
-能看到版本号就说明安装成功。
+## 4. 下载项目到固定目录
 
-## 2. 放置平台目录
+### 方式 A：使用 Git
 
-把整个仓库内容放到固定位置，例如：
+```powershell
+cd C:\
+git clone https://github.com/XMaoCAT/XMaoClock_Server.git
+```
 
-`C:\XMaoClock_Server`
+如果你没有 Git，可以去 Git 官网安装，或者直接在 GitHub 页面下载 ZIP。
 
-## 3. 启动平台
+### 方式 B：手动下载 ZIP
 
-双击：
+1. 打开仓库页面。
+2. 点击 `Code`。
+3. 点击 `Download ZIP`。
+4. 解压到：
 
-`start-server.bat`
+```text
+C:\XMaoClock_Server
+```
 
-或者在 PowerShell 里执行：
+## 5. 测试启动一次
 
 ```powershell
 cd C:\XMaoClock_Server
 node server.js
 ```
 
-默认访问地址：
+如果终端出现服务启动信息，打开浏览器访问：
 
-- 本机：`http://127.0.0.1:8080`
-- 局域网/公网：`http://你的公网IP:8080`
+```text
+http://127.0.0.1:8080
+```
 
-首次启动会自动创建：
+如果本机可打开，再继续配置开机自启。
 
-- `config.json`
-- `data\store.json`
+按 `Ctrl + C` 停止前台进程。
 
-## 4. 首次后台设置
+## 6. 配成开机自启
 
-打开网页后：
+### 方式 A：使用 PowerShell 任务计划程序命令
 
-1. 先设置后台密码
-2. 用这个密码登录
-3. 在后台添加设备串号
-4. 打开物理设备本地网页
-5. 在设备串号下方填入公网 IP 或域名
-6. 设备握手成功后，会进入设备列表
+以管理员身份打开 PowerShell，执行：
 
-## 5. 域名使用方式
+```powershell
+$TaskName = 'XMaoClock Remote Hub'
+$InstallDir = 'C:\XMaoClock_Server'
+$NodePath = (Get-Command node).Source
+$Action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c cd /d `"$InstallDir`" && `"$NodePath`" server.js"
+$Trigger = New-ScheduledTaskTrigger -AtStartup
+$Principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
+Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Force
+```
 
-如果你已经把域名解析到这台 Windows 服务器：
+### 方式 B：图形界面配置
 
-- 设备端可填写 `http://你的域名:8080`
-- 如果你前面有 IIS / Nginx / Caddy 做 443 反代，也可以直接填 `https://你的域名`
-
-项目内已经放好了 Windows 版模板：
-
-- `deploy/windows/Caddyfile`
-- `deploy/windows/start-with-caddy.bat`
-
-改好域名后，就可以用 Caddy 把公网 HTTPS 反代到本机的 `8080`。
-
-## 6. 配成开机自动启动
-
-最简单的方式是“任务计划程序”。
-
-### 方法一：登录后自动启动
-
-1. 打开“任务计划程序”
-2. 新建任务
-3. 触发器选“登录时”
-4. 操作选“启动程序”
-5. 程序填写：
+1. 打开“任务计划程序”。
+2. 点击“创建任务”。
+3. 名称填：`XMaoClock Remote Hub`。
+4. 触发器选“系统启动时”。
+5. 操作选“启动程序”。
+6. 程序填：
 
 ```text
 cmd.exe
 ```
 
-6. 参数填写：
+7. 参数填：
 
 ```text
 /c cd /d C:\XMaoClock_Server && node server.js
 ```
 
-### 方法二：服务器开机即启动
+## 7. 打开防火墙端口
 
-把触发器改成“系统启动时”即可。
-
-## 7. Windows 防火墙
-
-如果平台需要公网访问，请放行端口：
+以管理员身份打开 PowerShell：
 
 ```powershell
-netsh advfirewall firewall add rule name="XMaoClock Remote 8080" dir=in action=allow protocol=TCP localport=8080
+New-NetFirewallRule -DisplayName 'XMaoClock Remote 8080' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8080
 ```
 
-## 8. 常见问题
+查看规则是否存在：
 
-### 浏览器能打开，本地设备握手失败
+```powershell
+Get-NetFirewallRule -DisplayName 'XMaoClock Remote 8080'
+```
 
-通常是下面几种原因：
+如果你的机器在路由器后面，还要在路由器里做端口映射。
 
-- 运营商或云服务器安全组没有放行 8080
-- Windows 防火墙未放行
-- 设备填写了错误的公网 IP 或端口
-- 后台没有提前添加该设备串号
+## 8. 启动、停止、重启常用命令
 
-### 想彻底重置平台
+前台启动：
 
-先关闭运行中的 `node server.js`，然后删除：
+```powershell
+cd C:\XMaoClock_Server
+node server.js
+```
 
-- `config.json`
-- `data\store.json`
+后台隐藏启动：
 
-重新启动后会回到首次初始化。
+```powershell
+Start-Process -FilePath (Get-Command node).Source -ArgumentList 'server.js' -WorkingDirectory 'C:\XMaoClock_Server' -WindowStyle Hidden
+```
 
-### 我只想让家里设备连接到一个域名
+停止现有服务进程：
 
-那就把你的域名解析到服务器公网 IP，然后把这个域名填到设备本地网页即可。
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -like '*XMaoClock_Server*server.js*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+## 9. 首次登录后台
+
+浏览器打开：
+
+```text
+http://你的公网IP:8080
+```
+
+首次使用流程：
+
+1. 设置管理员密码。
+2. 登录后台。
+3. 添加设备串号。
+4. 可选填写备注名。
+5. 回到物理设备本地网页。
+6. 在设备串号下方填写公网 IP 或域名。
+7. 等待握手成功。
+8. 设备出现在线状态后，即可远程控制。
+
+## 10. 给域名配 HTTPS
+
+如果你已经把域名解析到这台 Windows 机器，最简单的 HTTPS 方案是 Caddy。
+
+### 第一步：安装 Caddy
+
+如果有 `winget`：
+
+```powershell
+winget install -e --id CaddyServer.Caddy
+```
+
+### 第二步：编辑 Caddyfile
+
+```powershell
+notepad C:\XMaoClock_Server\deploy\windows\Caddyfile
+```
+
+把示例域名改成你的真实域名，例如：
+
+```caddyfile
+clock.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+### 第三步：启动 Caddy
+
+如果 `caddy.exe` 已在 PATH 中：
+
+```powershell
+cd C:\XMaoClock_Server
+caddy run --config .\deploy\windows\Caddyfile
+```
+
+或者直接双击：
+
+```text
+C:\XMaoClock_Server\deploy\windows\start-with-caddy.bat
+```
+
+### 第四步：访问和设备填写
+
+浏览器访问：
+
+```text
+https://你的域名
+```
+
+设备端也建议填写：
+
+```text
+https://你的域名
+```
+
+## 11. 更新平台
+
+### 如果你是 Git 克隆的
+
+```powershell
+cd C:\XMaoClock_Server
+git pull
+```
+
+拉取后重启 Node 进程。
+
+### 如果你是再次执行一键脚本
+
+```powershell
+powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-windows.ps1 | iex"
+```
+
+脚本会保留旧的 `config.json` 与 `data\store.json`。
+
+## 12. 备份与重置
+
+### 备份
+
+```powershell
+Copy-Item C:\XMaoClock_Server\config.json C:\XMaoClock_Server\config.backup.json -Force
+Copy-Item C:\XMaoClock_Server\data\store.json C:\XMaoClock_Server\data\store.backup.json -Force
+```
+
+### 重置
+
+先停止服务进程，然后删除：
+
+```powershell
+Remove-Item C:\XMaoClock_Server\config.json -Force -ErrorAction SilentlyContinue
+Remove-Item C:\XMaoClock_Server\data\store.json -Force -ErrorAction SilentlyContinue
+```
+
+再重新启动 `node server.js`。
+
+## 13. 常见问题
+
+### 本机能打开，外网打不开
+
+优先检查：
+
+1. Windows 防火墙是否已放行 8080
+2. 路由器是否做了端口映射
+3. 运营商是否屏蔽了家庭宽带入站端口
+4. 机器是否真的有公网可访问地址
+
+### 设备提示串号没有在公网平台配置
+
+说明你还没有在后台添加这个设备串号。请先在管理页里添加，再回到设备端重新保存一次公网地址。
+
+### 想不带端口号访问
+
+请使用上面的 Caddy 域名反向代理方案。

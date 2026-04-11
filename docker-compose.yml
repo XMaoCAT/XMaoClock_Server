@@ -1,0 +1,27 @@
+name: xmaoclock-server
+
+services:
+  remote-hub:
+    build:
+      context: .
+    container_name: xmaoclock-server
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8080}
+      DEVICE_POLL_INTERVAL_MS: ${DEVICE_POLL_INTERVAL_MS:-8000}
+      SESSION_SECRET: ${SESSION_SECRET:-please-change-this-before-production}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - const http=require('http');const req=http.get({host:'127.0.0.1',port:Number(process.env.PORT||8080),path:'/api/bootstrap',timeout:4000},res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.on('timeout',()=>{req.destroy();process.exit(1);});
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

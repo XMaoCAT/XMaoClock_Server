@@ -5,7 +5,8 @@
   "description": "XMaoClock public remote control server for Windows and Ubuntu",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/app.js"
   },
   "engines": {
     "node": ">=18"

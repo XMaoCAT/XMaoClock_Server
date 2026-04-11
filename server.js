@@ -189,10 +189,27 @@ const config = loadJson(CONFIG_FILE, createDefaultConfig());
 let store = loadJson(STORE_FILE, createDefaultStore());
 const sessions = new Map();
 
+if (process.env.HOST) {
+  config.host = String(process.env.HOST).trim() || config.host;
+}
+
+if (process.env.PORT) {
+  config.port = clamp(process.env.PORT, 1, 65535, config.port);
+}
+
+if (process.env.DEVICE_POLL_INTERVAL_MS) {
+  config.devicePollIntervalMs = clamp(process.env.DEVICE_POLL_INTERVAL_MS, 5000, 60000, config.devicePollIntervalMs);
+}
+
 if (!config.sessionSecret) {
   config.sessionSecret = crypto.randomBytes(32).toString('hex');
-  writeJson(CONFIG_FILE, config);
 }
+
+if (process.env.SESSION_SECRET) {
+  config.sessionSecret = String(process.env.SESSION_SECRET).trim() || config.sessionSecret;
+}
+
+writeJson(CONFIG_FILE, config);
 
 function saveStore() {
   writeJson(STORE_FILE, store);
