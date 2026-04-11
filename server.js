@@ -12,7 +12,6 @@ const STORE_FILE = path.join(DATA_DIR, 'store.json');
 const ONLINE_WINDOW_MS = 20000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_HISTORY = 60;
-const COMMAND_RETRY_WINDOW_MS = 15000;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -431,7 +430,7 @@ function shouldDispatchCommand(command) {
     return true;
   }
 
-  return (Date.now() - dispatchedAtMs) >= COMMAND_RETRY_WINDOW_MS;
+  return (Date.now() - dispatchedAtMs) >= getCommandRetryWindowMs();
 }
 
 function buildDispatchCommands(device) {
@@ -452,6 +451,11 @@ function buildDispatchCommands(device) {
     });
 }
 
+function getCommandRetryWindowMs() {
+  const basePoll = clamp(config.devicePollIntervalMs, 5000, 60000, 8000);
+  return Math.max(4000, basePoll - 500);
+}
+
 function parseResultsInput(input) {
   if (!input) {
     return [];
@@ -459,10 +463,19 @@ function parseResultsInput(input) {
   if (Array.isArray(input)) {
     return input;
   }
+  if (typeof input === 'object' && input.commandId) {
+    return [input];
+  }
   if (typeof input === 'string') {
     try {
       const parsed = JSON.parse(input);
-      return Array.isArray(parsed) ? parsed : [];
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      if (parsed && typeof parsed === 'object' && parsed.commandId) {
+        return [parsed];
+      }
+      return [];
     } catch (error) {
       return [];
     }
