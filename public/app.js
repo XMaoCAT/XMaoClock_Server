@@ -4,7 +4,7 @@ const state = {
   devices: [],
   openCards: new Set(),
   pollTimer: null,
-  theme: localStorage.getItem('xmao_remote_theme') || 'dark'
+  theme: localStorage.getItem('xmao_remote_theme') || 'light'
 };
 
 const canvasEditors = new Map();
@@ -88,11 +88,11 @@ function setView() {
   els.loginPanel.classList.toggle('hidden', state.setupRequired || state.loggedIn);
   els.dashboardPanel.classList.toggle('hidden', state.setupRequired || !state.loggedIn);
   els.logoutBtn.classList.toggle('hidden', !state.loggedIn);
-  els.serverState.textContent = state.setupRequired ? '等待首次初始化' : state.loggedIn ? '管理后台在线' : '等待登录';
+  els.serverState.textContent = state.setupRequired ? '等待首次设置' : state.loggedIn ? '已登录，可管理设备' : '等待登录';
 }
 
 function formatAgo(value) {
-  if (!value) return '尚未握手';
+  if (!value) return '还没有首次连接';
   const diff = Date.now() - Date.parse(value);
   if (!Number.isFinite(diff) || diff < 0) return value;
   if (diff < 60000) return `${Math.max(1, Math.floor(diff / 1000))} 秒前`;
@@ -123,9 +123,9 @@ function bootAnimationName(type) {
 }
 
 function commandStatusLabel(status) {
-  if (status === 'queued') return '等待投递';
+  if (status === 'queued') return '已进入队列';
   if (status === 'sent') return '等待设备回执';
-  if (status === 'success') return '执行成功';
+  if (status === 'success') return '已执行成功';
   if (status === 'error') return '执行失败';
   return status || '未知状态';
 }
@@ -136,18 +136,18 @@ function rgbHex(rgb) {
 }
 
 function renderHistory(history) {
-  if (!history || history.length === 0) return '<div class="history-empty">还没有命令记录。</div>';
+  if (!history || history.length === 0) return '<div class="history-empty">这里还没有命令记录，等你第一次操作后就会显示。</div>';
   return history.map(item => `
     <div class="history-item ${escapeHtml(item.status || '')}">
       <strong>${escapeHtml(item.type || 'unknown')} · ${escapeHtml(commandStatusLabel(item.status || 'queued'))}</strong>
-      <div>${escapeHtml(item.resultMessage || '等待设备执行或回报结果')}</div>
+      <div>${escapeHtml(item.resultMessage || '设备还在处理这条命令，拿到结果后会显示在这里')}</div>
       <small>创建时间: ${escapeHtml(item.createdAt || '--')}${item.dispatchedAt ? ` · 最近投递: ${escapeHtml(item.dispatchedAt)}` : ''}${item.executedAt ? ` · 执行时间: ${escapeHtml(item.executedAt)}` : ''}</small>
     </div>
   `).join('');
 }
 
 function renderScheduledAlarms(device) {
-  if (!device.scheduledAlarms || device.scheduledAlarms.length === 0) return '<div class="empty-line">还没有计划闹钟</div>';
+  if (!device.scheduledAlarms || device.scheduledAlarms.length === 0) return '<div class="empty-line">还没有设置计划闹钟</div>';
   return device.scheduledAlarms.map(alarm => `
     <div class="alarm-chip">
       <span>${escapeHtml(describeAlarm(alarm))}</span>
@@ -157,7 +157,7 @@ function renderScheduledAlarms(device) {
 }
 
 function renderActiveAlarms(device) {
-  if (!device.activeAlarms || device.activeAlarms.length === 0) return '<div class="empty-line">当前没有正在响铃或执行中的闹钟</div>';
+  if (!device.activeAlarms || device.activeAlarms.length === 0) return '<div class="empty-line">当前没有正在执行或响铃的闹钟</div>';
   return device.activeAlarms.map(item => `
     <div class="active-alarm-row">
       <div><strong>${escapeHtml(item.id || '--')}</strong><small>${escapeHtml(item.type === 'pin' ? `引脚 ${item.pin}` : '蜂鸣器')}</small></div>
@@ -169,9 +169,9 @@ function renderActiveAlarms(device) {
 function renderPinCards() {
   return `
     <div class="pin-card-grid">
-      <form class="pin-form" data-type="start_pin"><div class="section-tag">Pulse</div><h4>定时拉高引脚</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><label><span>秒数</span><input name="seconds" type="number" min="1" max="600" value="3"></label><button class="primary-btn" type="submit">发送 /Start</button></form>
-      <form class="pin-form" data-type="open_pin"><div class="section-tag">Latch High</div><h4>保持高电平</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="secondary-btn" type="submit">发送 /Open</button></form>
-      <form class="pin-form" data-type="close_pin"><div class="section-tag">Latch Low</div><h4>拉低引脚</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="danger-ghost-btn" type="submit">发送 /Close</button></form>
+      <form class="pin-form" data-type="start_pin"><div class="section-tag">定时触发</div><h4>让引脚保持一段时间的高电平</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><label><span>持续秒数</span><input name="seconds" type="number" min="1" max="600" value="3"></label><button class="primary-btn" type="submit">发送开始指令</button></form>
+      <form class="pin-form" data-type="open_pin"><div class="section-tag">保持开启</div><h4>把引脚直接切换到高电平</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="secondary-btn" type="submit">发送打开指令</button></form>
+      <form class="pin-form" data-type="close_pin"><div class="section-tag">立即关闭</div><h4>把引脚切换回低电平</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="danger-ghost-btn" type="submit">发送关闭指令</button></form>
     </div>
   `;
 }
@@ -180,15 +180,18 @@ function createDeviceCardMarkup(device) {
   const rgb = device.rgb || { r: 0, g: 0, b: 0, brightness: 50, spectrum: false };
   const currentColor = rgbHex(rgb);
   const queueCount = Number(device.pendingQueueCount || 0);
-  const onlineText = device.online ? 'ONLINE' : 'OFFLINE';
-  const queueText = queueCount > 0 ? `QUEUE ${queueCount}` : 'QUEUE CLEAR';
+  const onlineText = device.online ? '设备在线' : '设备离线';
+  const queueText = queueCount > 0 ? `${queueCount} 条待确认命令` : '暂无待确认命令';
+  const wifiName = device.wifiSsid || '未连接 WiFi';
+  const tempText = device.sensor && device.sensor.available ? `${device.sensor.temperature} °C` : '未上报';
+  const humidityText = device.sensor && device.sensor.available ? `${device.sensor.humidity} %` : '未上报';
   const infoTiles = [
     makeInfoTile('局域网 IP', device.wifiIp || '--'),
     makeInfoTile('当前 WiFi', device.wifiSsid || '--', false, false),
     makeInfoTile('设备时间', device.deviceTime || '--', true),
     makeInfoTile('运行分钟', String(device.uptimeMinutes || 0)),
-    makeInfoTile('温度', device.sensor && device.sensor.available ? `${device.sensor.temperature} °C` : '未上报'),
-    makeInfoTile('湿度', device.sensor && device.sensor.available ? `${device.sensor.humidity} %` : '未上报'),
+    makeInfoTile('温度', tempText),
+    makeInfoTile('湿度', humidityText),
     makeInfoTile('设备 MAC', device.mac || '--'),
     makeInfoTile('固件版本', device.firmwareVersion || '--', false, false),
     makeInfoTile('计划闹钟', String((device.scheduledAlarms || []).length)),
@@ -206,40 +209,55 @@ function createDeviceCardMarkup(device) {
             <span class="status-pill ${device.online ? 'online' : 'offline'}">${onlineText}</span>
             <span class="queue-badge ${queueCount > 0 ? 'active' : ''}">${queueText}</span>
           </div>
-          <h3 class="device-title">${escapeHtml(device.alias || device.serial)}</h3>
+          <h3 class="device-title">${escapeHtml(device.alias || '未命名设备')}</h3>
           <div class="device-subline">
             <span class="device-serial mono">${escapeHtml(device.serial)}</span>
             <span class="device-divider"></span>
-            <span class="device-last-seen">${device.online ? '设备正在在线' : `最后在线: ${escapeHtml(formatAgo(device.lastSeenAt))}`}</span>
+            <span class="device-last-seen">${device.online ? '最近一次心跳正常，设备可以接收命令' : `最后在线 ${escapeHtml(formatAgo(device.lastSeenAt))}`}</span>
+          </div>
+          <div class="device-quick-list">
+            <div class="device-quick-chip">
+              <span>当前网络</span>
+              <strong>${escapeHtml(wifiName)}</strong>
+            </div>
+            <div class="device-quick-chip">
+              <span>设备时间</span>
+              <strong class="mono">${escapeHtml(device.deviceTime || '--')}</strong>
+            </div>
+            <div class="device-quick-chip">
+              <span>环境数据</span>
+              <strong>${escapeHtml(`${tempText} / ${humidityText}`)}</strong>
+            </div>
           </div>
         </div>
         <div class="device-head-side">
           <div class="signal-stack">
-            <span>Link Address</span>
+            <span>局域网地址</span>
             <strong class="mono">${escapeHtml(device.wifiIp || '--')}</strong>
+            <small>${device.online ? '现在可以直接下发远程指令' : '设备离线时，命令会在下次心跳时自动获取'}</small>
           </div>
-          <span class="device-toggle">${isOpen ? '收起' : '展开'}</span>
+          <span class="device-toggle">${isOpen ? '收起详情' : '展开详情'}</span>
         </div>
       </button>
       <div class="device-card-body ${isOpen ? '' : 'hidden'}">
         <div class="device-info-grid">${infoTiles}</div>
         <div class="device-sections">
           <section class="device-section span-2">
-            <div class="section-head"><div><div class="section-tag">Core Controls</div><h4>基础操作</h4><p>重命名、时间同步、重启、删除设备与联网后热点广播都在这里。</p></div><button class="danger-ghost-btn delete-device-btn" type="button">删除设备</button></div>
+            <div class="section-head"><div><div class="section-tag">常用操作</div><h4>先处理最常用的设置</h4><p>这里可以改设备名称、同步时间、重启设备，以及决定联网后是否继续广播自身热点。</p></div><button class="danger-ghost-btn delete-device-btn" type="button">删除设备</button></div>
             <form class="rename-form inline-form"><label><span>重命名</span><input class="rename-input" type="text" value="${escapeHtml(device.alias || '')}" placeholder="修改这个设备的备注名称"></label><button class="secondary-btn" type="submit">保存备注</button></form>
             <div class="action-grid">
-              <button class="secondary-btn command-btn" data-type="ping" type="button">在线探测</button>
+              <button class="secondary-btn command-btn" data-type="ping" type="button">检测在线状态</button>
               <button class="secondary-btn command-btn" data-type="restart" type="button">远程重启</button>
-              <button class="secondary-btn command-btn" data-type="sync_time" type="button">同步浏览器时间</button>
-              <button class="secondary-btn toggle-ap-btn" type="button">${device.apBroadcastEnabled ? '关闭联网后热点广播' : '开启联网后热点广播'}</button>
+              <button class="secondary-btn command-btn" data-type="sync_time" type="button">同步当前设备时间</button>
+              <button class="secondary-btn toggle-ap-btn" type="button">${device.apBroadcastEnabled ? '联网后不再广播热点' : '联网后继续广播热点'}</button>
             </div>
           </section>
           <section class="device-section">
-            <div class="section-head compact"><div><div class="section-tag">Boot Profile</div><h4>设备风格</h4><p>这里控制开机动画。网页主题在页头切换。</p></div></div>
+            <div class="section-head compact"><div><div class="section-tag">显示风格</div><h4>开机动画设置</h4><p>这里只会修改设备开机动画，不影响网页主题。</p></div></div>
             <form class="boot-form stack-form compact-stack"><label><span>开机动画</span><select class="boot-type-select"><option value="1" ${Number(device.bootAnimationType) === 1 ? 'selected' : ''}>经典版</option><option value="2" ${Number(device.bootAnimationType) === 2 ? 'selected' : ''}>V6.0 酱炫版</option></select></label><button class="secondary-btn boot-apply-btn" type="submit">保存并重启设备</button></form>
           </section>
           <section class="device-section span-2">
-            <div class="section-head"><div><div class="section-tag">Alarm Matrix</div><h4>远程闹钟</h4><p>支持蜂鸣器闹钟和定时引脚任务。</p></div><button class="ghost-btn clear-alarms-btn" type="button">清空全部闹钟</button></div>
+            <div class="section-head"><div><div class="section-tag">闹钟</div><h4>计划提醒与定时动作</h4><p>既可以添加蜂鸣器闹钟，也可以创建定时的引脚任务。</p></div><button class="ghost-btn clear-alarms-btn" type="button">清空全部闹钟</button></div>
             <div class="subsection-grid"><div class="sub-card"><h5>计划中的闹钟</h5><div class="alarm-stack">${renderScheduledAlarms(device)}</div></div><div class="sub-card"><h5>当前活跃</h5><div class="alarm-stack">${renderActiveAlarms(device)}</div></div></div>
             <form class="alarm-form field-grid">
               <label><span>时间</span><input name="time" type="time" step="1" required></label>
@@ -250,7 +268,7 @@ function createDeviceCardMarkup(device) {
             </form>
           </section>
           <section class="device-section span-2">
-            <div class="section-head"><div><div class="section-tag">Canvas Link</div><h4>远程画板</h4><p>在公网后台直接画 128x64 点阵图，设备下次心跳就会显示。</p></div></div>
+            <div class="section-head"><div><div class="section-tag">画板</div><h4>远程绘制屏幕内容</h4><p>直接在这里画 128x64 点阵图，设备下次心跳时就会显示到屏幕上。</p></div></div>
             <div class="canvas-tools">
               <button class="tool-chip active" type="button" data-tool="draw">画笔</button>
               <button class="tool-chip" type="button" data-tool="erase">橡皮</button>
@@ -263,7 +281,7 @@ function createDeviceCardMarkup(device) {
             <div class="remote-canvas-shell"><canvas class="remote-canvas" width="384" height="192"></canvas></div>
           </section>
           <section class="device-section span-2">
-            <div class="section-head"><div><div class="section-tag">Light Stack</div><h4>RGB 与亮度</h4><p>支持颜色、亮度、预设色和光谱模式。</p></div></div>
+            <div class="section-head"><div><div class="section-tag">灯光</div><h4>RGB 与亮度</h4><p>支持自定义颜色、亮度调节、预设色和彩虹光谱模式。</p></div></div>
             <div class="rgb-grid">
               <label><span>颜色</span><input class="rgb-color-input" type="color" value="${escapeHtml(currentColor)}"></label>
               <label><span>亮度 ${escapeHtml(String(rgb.brightness || 0))}%</span><input class="rgb-brightness-input" type="range" min="0" max="100" value="${escapeHtml(String(rgb.brightness || 0))}"></label>
@@ -272,8 +290,8 @@ function createDeviceCardMarkup(device) {
             </div>
             <div class="preset-row"><button class="chip-btn rgb-preset-btn" type="button" data-color="red">红</button><button class="chip-btn rgb-preset-btn" type="button" data-color="green">绿</button><button class="chip-btn rgb-preset-btn" type="button" data-color="blue">蓝</button><button class="chip-btn rgb-off-btn" type="button">关闭</button></div>
           </section>
-          <section class="device-section span-2"><div class="section-head"><div><div class="section-tag">GPIO Bus</div><h4>GPIO 远控</h4><p>通过公网后台直接触发 /Start、/Open、/Close。</p></div></div>${renderPinCards()}</section>
-          <section class="device-section span-2 history-box section-history"><div class="history-head"><div><div class="section-tag">Command Log</div><h4>最近命令记录</h4></div><span class="history-tip">命令会保留在队列里，直到设备真正回执成功或失败。</span></div><div class="history-list">${renderHistory(device.commandHistory)}</div></section>
+          <section class="device-section span-2"><div class="section-head"><div><div class="section-tag">进阶控制</div><h4>GPIO 远程控制</h4><p>如果你需要触发引脚动作，可以在这里直接下发开始、打开和关闭指令。</p></div></div>${renderPinCards()}</section>
+          <section class="device-section span-2 history-box section-history"><div class="history-head"><div><div class="section-tag">执行记录</div><h4>最近命令记录</h4></div><span class="history-tip">命令会一直保留，直到设备真正返回成功或失败结果。</span></div><div class="history-list">${renderHistory(device.commandHistory)}</div></section>
         </div>
       </div>
     </article>
@@ -672,7 +690,7 @@ function renderDevices() {
   if (state.devices.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'hint-box';
-    empty.textContent = '当前还没有任何设备进入编队。先添加设备串号，再去实体设备的本地页面填写公网地址，等待首次握手后它就会出现在这里。';
+    empty.textContent = '当前还没有设备出现在这里。先添加设备串号，再去实体设备的本地页面填写公网地址，等它完成首次握手后就会自动显示。';
     els.deviceGrid.appendChild(empty);
     return;
   }

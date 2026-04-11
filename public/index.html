@@ -6,168 +6,135 @@
   <title>XMaoClock Remote Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="sidebar-block brand-block">
-        <div class="eyebrow">XMaoClock Remote Hub</div>
-        <h1>Industrial Fleet Console</h1>
-        <p>公网设备注册、命令投递、状态回执与遥测监视统一收束在同一块工业化控制台里。</p>
-      </div>
-
-      <nav class="sidebar-nav sidebar-block" aria-label="控制台导航">
-        <button class="nav-item active" type="button">总览矩阵</button>
-        <button class="nav-item" type="button">设备编队</button>
-        <button class="nav-item" type="button">命令回执</button>
-        <button class="nav-item" type="button">公网握手</button>
-      </nav>
-
-      <section class="sidebar-block side-card-grid">
-        <article class="side-card accent-card">
-          <span class="side-kicker">Dispatch Model</span>
-          <strong>Retain Until Ack</strong>
-          <p>命令不会在首次投递后立即丢弃，平台会等待设备成功或失败回执后再从队列中移除。</p>
-        </article>
-        <article class="side-card">
-          <span class="side-kicker">Operator Flow</span>
-          <div class="flow-mini-list">
-            <div><span>01</span><p>录入设备串号</p></div>
-            <div><span>02</span><p>设备填写公网地址</p></div>
-            <div><span>03</span><p>握手成功后进入在线轮询</p></div>
-            <div><span>04</span><p>控制命令进入待确认队列</p></div>
-          </div>
-        </article>
-      </section>
-
-      <div class="sidebar-foot sidebar-block">
-        <span class="side-kicker">Transport</span>
-        <strong>HTTPS / Public IP / BaoTa Reverse Proxy</strong>
-      </div>
-    </aside>
-
-    <main class="workspace">
-      <header class="topbar">
+    <header class="topbar">
+      <section class="topbar-card">
         <div class="topbar-copy">
-          <div class="topbar-label">PUBLIC DEVICE OPERATIONS</div>
-          <h2>多设备公网管理与远程控制中心</h2>
-          <p>面向设备运维的现代工业化仪表盘。优先显示在线状态、命令队列与关键遥测，再进入具体控制区。</p>
+          <div class="eyebrow">XMaoClock Remote Hub</div>
+          <h1>远程管理中心</h1>
+          <p>把设备加入平台后，常用功能都会直接出现在设备卡片里。先添加设备串号，再去设备本地页面填写公网地址，就能开始远程控制。</p>
+          <div class="hero-tags" aria-label="平台特点">
+            <span class="mini-chip">圆角卡片布局</span>
+            <span class="mini-chip">多设备统一管理</span>
+            <span class="mini-chip">心跳自动同步</span>
+          </div>
         </div>
         <div class="topbar-actions">
           <div class="status-panel">
-            <span class="status-caption">Server State</span>
+            <span class="status-caption">平台状态</span>
             <strong id="server-state">初始化中</strong>
           </div>
           <div class="theme-switch">
-            <button class="ghost-btn active" data-theme-choice="dark" type="button">暗色工业</button>
-            <button class="ghost-btn" data-theme-choice="light" type="button">浅色审阅</button>
+            <button class="ghost-btn active" data-theme-choice="light" type="button">浅色主题</button>
+            <button class="ghost-btn" data-theme-choice="dark" type="button">深色主题</button>
           </div>
-          <button class="ghost-btn hidden" id="logout-btn" type="button">退出登录</button>
+          <button class="secondary-btn hidden" id="logout-btn" type="button">退出登录</button>
         </div>
-      </header>
+      </section>
+    </header>
 
-      <main class="workspace-stack">
-        <section class="auth-card hidden" id="setup-panel">
-          <div class="section-tag">Bootstrap</div>
-          <h3>首次初始化控制台</h3>
-          <p>第一次打开平台时，先设置管理员密码。后续所有公网设备绑定与控制都将受此会话保护。</p>
-          <form id="setup-form" class="stack-form auth-form">
-            <label>
-              <span>管理员密码</span>
-              <input id="setup-password" type="password" minlength="6" placeholder="至少 6 位">
-            </label>
-            <button class="primary-btn" type="submit">写入初始密码</button>
-          </form>
-        </section>
+    <main class="workspace">
+      <section class="auth-card hidden" id="setup-panel">
+        <div class="section-tag">首次使用</div>
+        <h2>先设置管理员密码</h2>
+        <p>第一次打开平台时，只需要设置一个后台密码。以后登录、添加设备和远程控制都会用到它。</p>
+        <form id="setup-form" class="stack-form auth-form">
+          <label>
+            <span>管理员密码</span>
+            <input id="setup-password" type="password" minlength="6" placeholder="至少 6 位">
+          </label>
+          <button class="primary-btn" type="submit">保存并开始使用</button>
+        </form>
+      </section>
 
-        <section class="auth-card hidden" id="login-panel">
-          <div class="section-tag">Authenticate</div>
-          <h3>进入公网控制台</h3>
-          <p>登录后即可查看设备在线状态、等待回执命令以及完整的远程闹钟 / RGB / 画板控制区。</p>
-          <form id="login-form" class="stack-form auth-form">
-            <label>
-              <span>管理员密码</span>
-              <input id="login-password" type="password" placeholder="输入后台密码">
-            </label>
-            <button class="primary-btn" type="submit">登录平台</button>
-          </form>
-        </section>
+      <section class="auth-card hidden" id="login-panel">
+        <div class="section-tag">登录后台</div>
+        <h2>输入密码进入管理页面</h2>
+        <p>登录后就能看到设备状态、等待回执的命令，以及闹钟、画板、灯光和 GPIO 等远程控制功能。</p>
+        <form id="login-form" class="stack-form auth-form">
+          <label>
+            <span>管理员密码</span>
+            <input id="login-password" type="password" placeholder="输入后台密码">
+          </label>
+          <button class="primary-btn" type="submit">登录平台</button>
+        </form>
+      </section>
 
-        <section class="dashboard-panel hidden" id="dashboard-panel">
-          <div class="overview-grid">
-            <section class="overview-panel registry-panel">
-              <div class="panel-head">
-                <div>
-                  <div class="section-tag">Registry</div>
-                  <h3>设备录入与编队入口</h3>
-                  <p>先录入设备串号，再去设备本地网页填写公网域名或公网 IP，完成首次握手。</p>
-                </div>
-                <div class="mini-chip mono">5s POLL LOOP</div>
+      <section class="dashboard-panel hidden" id="dashboard-panel">
+        <div class="overview-grid">
+          <section class="overview-panel registry-panel">
+            <div class="panel-head">
+              <div>
+                <div class="section-tag">添加设备</div>
+                <h3>先把设备加入到管理列表</h3>
+                <p>设备串号来自实体设备本地页面。添加完成后，再去设备端填写公网地址完成握手。</p>
               </div>
-              <form id="device-form" class="device-form">
-                <label>
-                  <span>设备串号</span>
-                  <input id="device-serial" type="text" placeholder="例如 XM-ABCDE-FGHIJ-KLMNO-PQRST">
-                </label>
-                <label>
-                  <span>备注名称</span>
-                  <input id="device-alias" type="text" placeholder="例如 卧室时钟 / 书房屏">
-                </label>
-                <button class="primary-btn" type="submit">加入设备编队</button>
-              </form>
-            </section>
+              <div class="mini-chip mono">5s 自动刷新</div>
+            </div>
+            <form id="device-form" class="device-form">
+              <label>
+                <span>设备串号</span>
+                <input id="device-serial" type="text" placeholder="例如 XM-ABCDE-FGHIJ-KLMNO-PQRST">
+              </label>
+              <label>
+                <span>备注名称</span>
+                <input id="device-alias" type="text" placeholder="例如 卧室时钟 / 书桌屏">
+              </label>
+              <button class="primary-btn" type="submit">添加到设备列表</button>
+            </form>
+          </section>
 
-            <section class="overview-panel metrics-panel">
-              <div class="metrics-grid">
-                <div class="metric-cell">
-                  <span>Total Nodes</span>
-                  <strong id="device-count">0</strong>
-                </div>
-                <div class="metric-cell accent-cell">
-                  <span>Online</span>
-                  <strong id="online-count">0</strong>
-                </div>
-                <div class="metric-cell">
-                  <span>Command Policy</span>
-                  <strong>ACK HOLD</strong>
-                </div>
-                <div class="metric-cell">
-                  <span>Transport</span>
-                  <strong>HEARTBEAT</strong>
-                </div>
+          <section class="overview-panel metrics-panel">
+            <div class="panel-head compact-head">
+              <div>
+                <div class="section-tag">总览</div>
+                <h3>当前平台概况</h3>
               </div>
-            </section>
+            </div>
+            <div class="metrics-grid">
+              <div class="metric-cell">
+                <span>设备总数</span>
+                <strong id="device-count">0</strong>
+              </div>
+              <div class="metric-cell accent-cell">
+                <span>在线设备</span>
+                <strong id="online-count">0</strong>
+              </div>
+              <div class="metric-cell">
+                <span>命令保留</span>
+                <strong>直到回执</strong>
+              </div>
+              <div class="metric-cell">
+                <span>下发方式</span>
+                <strong>设备心跳拉取</strong>
+              </div>
+            </div>
+          </section>
 
-            <section class="overview-panel workflow-panel">
-              <div class="panel-head compact-head">
-                <div>
-                  <div class="section-tag">Workflow</div>
-                  <h3>推荐操作序列</h3>
-                </div>
+          <section class="overview-panel workflow-panel">
+            <div class="panel-head compact-head">
+              <div>
+                <div class="section-tag">使用步骤</div>
+                <h3>按这个顺序操作最顺手</h3>
               </div>
-              <div class="workflow-list">
-                <div class="workflow-row"><span>01</span><p>后台添加设备串号</p></div>
-                <div class="workflow-row"><span>02</span><p>设备端填写公网地址并握手</p></div>
-                <div class="workflow-row"><span>03</span><p>平台接收心跳并展示在线态</p></div>
-                <div class="workflow-row"><span>04</span><p>命令进入队列，等待设备确认</p></div>
-              </div>
-            </section>
-          </div>
+            </div>
+            <div class="workflow-list">
+              <div class="workflow-row"><span>1</span><p>在这里录入设备串号和备注名称</p></div>
+              <div class="workflow-row"><span>2</span><p>打开设备本地页面，填写公网域名或公网 IP</p></div>
+              <div class="workflow-row"><span>3</span><p>等待设备心跳后上线，在线状态会自动刷新</p></div>
+              <div class="workflow-row"><span>4</span><p>点开设备卡片，直接操作闹钟、画板、灯光和更多功能</p></div>
+            </div>
+          </section>
+        </div>
 
-          <div class="hint-box">推荐正式环境使用反向代理后的 HTTPS 域名。公网控制命令会在设备下次心跳时被拉取，并在真正收到执行结果前保持在待确认队列中。</div>
-          <div class="device-grid" id="device-grid"></div>
-        </section>
-      </main>
+        <div class="hint-box">推荐正式环境使用已经配置好的域名或公网 IP。命令会在设备下次心跳时被拉取，并在真正收到执行结果前持续保留在待确认队列中。</div>
+        <div class="device-grid" id="device-grid"></div>
+      </section>
     </main>
-  </div>
-
-  <div class="mobile-dock" aria-hidden="true">
-    <span>OVERVIEW</span>
-    <span>DEVICES</span>
-    <span>QUEUE</span>
-    <span>LINK</span>
   </div>
 
   <template id="device-card-template"><div></div></template>
