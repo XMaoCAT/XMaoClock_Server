@@ -101,8 +101,8 @@ function formatAgo(value) {
   return `${Math.floor(diff / 86400000)} 天前`;
 }
 
-function makeInfoTile(label, value, emphasis = false) {
-  return `<div class="info-tile${emphasis ? ' emphasis' : ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || '--')}</strong></div>`;
+function makeInfoTile(label, value, emphasis = false, mono = true) {
+  return `<div class="info-tile${emphasis ? ' emphasis' : ''}"><span>${escapeHtml(label)}</span><strong class="${mono ? 'mono' : ''}">${escapeHtml(value || '--')}</strong></div>`;
 }
 
 function normalizeAlarmTime(value) {
@@ -169,9 +169,9 @@ function renderActiveAlarms(device) {
 function renderPinCards() {
   return `
     <div class="pin-card-grid">
-      <form class="pin-form" data-type="start_pin"><h4>定时拉高引脚</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><label><span>秒数</span><input name="seconds" type="number" min="1" max="600" value="3"></label><button class="primary-btn" type="submit">发送 /Start</button></form>
-      <form class="pin-form" data-type="open_pin"><h4>保持高电平</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="primary-btn" type="submit">发送 /Open</button></form>
-      <form class="pin-form" data-type="close_pin"><h4>拉低引脚</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="primary-btn danger-btn" type="submit">发送 /Close</button></form>
+      <form class="pin-form" data-type="start_pin"><div class="section-tag">Pulse</div><h4>定时拉高引脚</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><label><span>秒数</span><input name="seconds" type="number" min="1" max="600" value="3"></label><button class="primary-btn" type="submit">发送 /Start</button></form>
+      <form class="pin-form" data-type="open_pin"><div class="section-tag">Latch High</div><h4>保持高电平</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="secondary-btn" type="submit">发送 /Open</button></form>
+      <form class="pin-form" data-type="close_pin"><div class="section-tag">Latch Low</div><h4>拉低引脚</h4><label><span>引脚</span><input name="pin" type="number" min="0" max="39" placeholder="13"></label><button class="danger-ghost-btn" type="submit">发送 /Close</button></form>
     </div>
   `;
 }
@@ -179,34 +179,45 @@ function createDeviceCardMarkup(device) {
   const isOpen = state.openCards.has(device.serial);
   const rgb = device.rgb || { r: 0, g: 0, b: 0, brightness: 50, spectrum: false };
   const currentColor = rgbHex(rgb);
+  const queueCount = Number(device.pendingQueueCount || 0);
+  const onlineText = device.online ? 'ONLINE' : 'OFFLINE';
+  const queueText = queueCount > 0 ? `QUEUE ${queueCount}` : 'QUEUE CLEAR';
   const infoTiles = [
     makeInfoTile('局域网 IP', device.wifiIp || '--'),
-    makeInfoTile('当前 WiFi', device.wifiSsid || '--'),
+    makeInfoTile('当前 WiFi', device.wifiSsid || '--', false, false),
     makeInfoTile('设备时间', device.deviceTime || '--', true),
     makeInfoTile('运行分钟', String(device.uptimeMinutes || 0)),
     makeInfoTile('温度', device.sensor && device.sensor.available ? `${device.sensor.temperature} °C` : '未上报'),
     makeInfoTile('湿度', device.sensor && device.sensor.available ? `${device.sensor.humidity} %` : '未上报'),
     makeInfoTile('设备 MAC', device.mac || '--'),
-    makeInfoTile('固件版本', device.firmwareVersion || '--'),
+    makeInfoTile('固件版本', device.firmwareVersion || '--', false, false),
     makeInfoTile('计划闹钟', String((device.scheduledAlarms || []).length)),
     makeInfoTile('活跃闹钟', String((device.activeAlarms || []).length)),
     makeInfoTile('待确认命令', String(device.pendingQueueCount || 0), Number(device.pendingQueueCount || 0) > 0),
-    makeInfoTile('RGB 状态', rgb.spectrum ? '光谱模式' : `${currentColor.toUpperCase()} · ${rgb.brightness}%`),
-    makeInfoTile('显示风格', `${bootAnimationName(device.bootAnimationType)}${device.canvasDisplayActive ? ' · 画板显示中' : ''}`)
+    makeInfoTile('RGB 状态', rgb.spectrum ? '光谱模式' : `${currentColor.toUpperCase()} · ${rgb.brightness}%`, false, false),
+    makeInfoTile('显示风格', `${bootAnimationName(device.bootAnimationType)}${device.canvasDisplayActive ? ' · 画板显示中' : ''}`, false, false)
   ].join('');
 
   return `
     <article class="device-card" data-serial="${escapeHtml(device.serial)}">
       <button class="device-card-head" type="button">
-        <div>
-          <div class="device-title-row">
-            <h3 class="device-title">${escapeHtml(device.alias || device.serial)}</h3>
-            <span class="status-badge ${device.online ? 'online' : 'offline'}">${device.online ? '在线' : '离线'}</span>
+        <div class="device-head-main">
+          <div class="device-head-top">
+            <span class="status-pill ${device.online ? 'online' : 'offline'}">${onlineText}</span>
+            <span class="queue-badge ${queueCount > 0 ? 'active' : ''}">${queueText}</span>
           </div>
-          <p class="device-serial">${escapeHtml(device.serial)}</p>
+          <h3 class="device-title">${escapeHtml(device.alias || device.serial)}</h3>
+          <div class="device-subline">
+            <span class="device-serial mono">${escapeHtml(device.serial)}</span>
+            <span class="device-divider"></span>
+            <span class="device-last-seen">${device.online ? '设备正在在线' : `最后在线: ${escapeHtml(formatAgo(device.lastSeenAt))}`}</span>
+          </div>
         </div>
-        <div class="device-meta">
-          <span class="device-last-seen">${device.online ? '设备正在在线' : `最后在线: ${escapeHtml(formatAgo(device.lastSeenAt))}`}</span>
+        <div class="device-head-side">
+          <div class="signal-stack">
+            <span>Link Address</span>
+            <strong class="mono">${escapeHtml(device.wifiIp || '--')}</strong>
+          </div>
           <span class="device-toggle">${isOpen ? '收起' : '展开'}</span>
         </div>
       </button>
@@ -214,7 +225,7 @@ function createDeviceCardMarkup(device) {
         <div class="device-info-grid">${infoTiles}</div>
         <div class="device-sections">
           <section class="device-section span-2">
-            <div class="section-head"><div><h4>基础操作</h4><p>重命名、时间同步、重启、删除设备与联网后热点广播都在这里。</p></div><button class="danger-ghost-btn delete-device-btn" type="button">删除设备</button></div>
+            <div class="section-head"><div><div class="section-tag">Core Controls</div><h4>基础操作</h4><p>重命名、时间同步、重启、删除设备与联网后热点广播都在这里。</p></div><button class="danger-ghost-btn delete-device-btn" type="button">删除设备</button></div>
             <form class="rename-form inline-form"><label><span>重命名</span><input class="rename-input" type="text" value="${escapeHtml(device.alias || '')}" placeholder="修改这个设备的备注名称"></label><button class="secondary-btn" type="submit">保存备注</button></form>
             <div class="action-grid">
               <button class="secondary-btn command-btn" data-type="ping" type="button">在线探测</button>
@@ -224,11 +235,11 @@ function createDeviceCardMarkup(device) {
             </div>
           </section>
           <section class="device-section">
-            <div class="section-head compact"><div><h4>设备风格</h4><p>这里控制开机动画。网页主题在页头切换。</p></div></div>
+            <div class="section-head compact"><div><div class="section-tag">Boot Profile</div><h4>设备风格</h4><p>这里控制开机动画。网页主题在页头切换。</p></div></div>
             <form class="boot-form stack-form compact-stack"><label><span>开机动画</span><select class="boot-type-select"><option value="1" ${Number(device.bootAnimationType) === 1 ? 'selected' : ''}>经典版</option><option value="2" ${Number(device.bootAnimationType) === 2 ? 'selected' : ''}>V6.0 酱炫版</option></select></label><button class="secondary-btn boot-apply-btn" type="submit">保存并重启设备</button></form>
           </section>
           <section class="device-section span-2">
-            <div class="section-head"><div><h4>远程闹钟</h4><p>支持蜂鸣器闹钟和定时引脚任务。</p></div><button class="ghost-btn clear-alarms-btn" type="button">清空全部闹钟</button></div>
+            <div class="section-head"><div><div class="section-tag">Alarm Matrix</div><h4>远程闹钟</h4><p>支持蜂鸣器闹钟和定时引脚任务。</p></div><button class="ghost-btn clear-alarms-btn" type="button">清空全部闹钟</button></div>
             <div class="subsection-grid"><div class="sub-card"><h5>计划中的闹钟</h5><div class="alarm-stack">${renderScheduledAlarms(device)}</div></div><div class="sub-card"><h5>当前活跃</h5><div class="alarm-stack">${renderActiveAlarms(device)}</div></div></div>
             <form class="alarm-form field-grid">
               <label><span>时间</span><input name="time" type="time" step="1" required></label>
@@ -239,7 +250,7 @@ function createDeviceCardMarkup(device) {
             </form>
           </section>
           <section class="device-section span-2">
-            <div class="section-head"><div><h4>远程画板</h4><p>在公网后台直接画 128x64 点阵图，设备下次心跳就会显示。</p></div></div>
+            <div class="section-head"><div><div class="section-tag">Canvas Link</div><h4>远程画板</h4><p>在公网后台直接画 128x64 点阵图，设备下次心跳就会显示。</p></div></div>
             <div class="canvas-tools">
               <button class="tool-chip active" type="button" data-tool="draw">画笔</button>
               <button class="tool-chip" type="button" data-tool="erase">橡皮</button>
@@ -252,7 +263,7 @@ function createDeviceCardMarkup(device) {
             <div class="remote-canvas-shell"><canvas class="remote-canvas" width="384" height="192"></canvas></div>
           </section>
           <section class="device-section span-2">
-            <div class="section-head"><div><h4>RGB 与亮度</h4><p>支持颜色、亮度、预设色和光谱模式。</p></div></div>
+            <div class="section-head"><div><div class="section-tag">Light Stack</div><h4>RGB 与亮度</h4><p>支持颜色、亮度、预设色和光谱模式。</p></div></div>
             <div class="rgb-grid">
               <label><span>颜色</span><input class="rgb-color-input" type="color" value="${escapeHtml(currentColor)}"></label>
               <label><span>亮度 ${escapeHtml(String(rgb.brightness || 0))}%</span><input class="rgb-brightness-input" type="range" min="0" max="100" value="${escapeHtml(String(rgb.brightness || 0))}"></label>
@@ -261,8 +272,8 @@ function createDeviceCardMarkup(device) {
             </div>
             <div class="preset-row"><button class="chip-btn rgb-preset-btn" type="button" data-color="red">红</button><button class="chip-btn rgb-preset-btn" type="button" data-color="green">绿</button><button class="chip-btn rgb-preset-btn" type="button" data-color="blue">蓝</button><button class="chip-btn rgb-off-btn" type="button">关闭</button></div>
           </section>
-          <section class="device-section span-2"><div class="section-head"><div><h4>GPIO 远控</h4><p>通过公网后台直接触发 /Start、/Open、/Close。</p></div></div>${renderPinCards()}</section>
-          <section class="device-section span-2 history-box section-history"><div class="history-head"><h4>最近命令记录</h4><span class="history-tip">命令会保留在队列里，直到设备真正回执成功或失败。</span></div><div class="history-list">${renderHistory(device.commandHistory)}</div></section>
+          <section class="device-section span-2"><div class="section-head"><div><div class="section-tag">GPIO Bus</div><h4>GPIO 远控</h4><p>通过公网后台直接触发 /Start、/Open、/Close。</p></div></div>${renderPinCards()}</section>
+          <section class="device-section span-2 history-box section-history"><div class="history-head"><div><div class="section-tag">Command Log</div><h4>最近命令记录</h4></div><span class="history-tip">命令会保留在队列里，直到设备真正回执成功或失败。</span></div><div class="history-list">${renderHistory(device.commandHistory)}</div></section>
         </div>
       </div>
     </article>
@@ -661,7 +672,7 @@ function renderDevices() {
   if (state.devices.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'hint-box';
-    empty.textContent = '还没有任何设备。先添加一个设备串号，再去物理设备的本地网页里填写公网地址。';
+    empty.textContent = '当前还没有任何设备进入编队。先添加设备串号，再去实体设备的本地页面填写公网地址，等待首次握手后它就会出现在这里。';
     els.deviceGrid.appendChild(empty);
     return;
   }
