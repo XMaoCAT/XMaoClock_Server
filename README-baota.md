@@ -1,123 +1,166 @@
-# XMaoClock Remote Hub 宝塔面板部署说明
+# XMaoClock Remote Hub 宝塔面板直接部署说明
 
-这份文档专门写给想用宝塔面板做域名、网站、HTTPS、反向代理的人。
+这份文档默认你的服务器已经装好了宝塔面板。
 
-最适合的理解方式是：
+重点先说清楚：
 
-- `XMaoClock Server` 本身是一个 Node.js 服务，实际监听 `127.0.0.1:9230` 或 `0.0.0.0:9230`
-- 宝塔面板负责帮你做域名绑定、反向代理、SSL 证书、图形化管理
-- 物理设备最后填写的是你的公网域名，例如 `https://clock.example.com`
+- XMaoClock Server 是一个普通 Node.js 小项目
+- 它可以直接部署进你现有的宝塔环境
+- 不需要为了它重装宝塔
+- 也不要求服务器必须是“纯净系统”
 
-也就是说，宝塔在这里主要负责“入口层”和“证书层”，业务服务本体还是我们这个 Node.js 平台。
+你刚才看到的“建议在纯净系统安装宝塔”，那是宝塔官方安装面板脚本自己的提示，不是 XMaoClock 项目的要求。
 
-## 1. 准备开始之前
+如果你的服务器已经有宝塔，请不要再执行宝塔面板安装脚本，直接部署本项目即可。
 
-你至少需要：
+## 1. 你现在应该用哪种方式
 
-- 一台 Ubuntu 22.04 / 24.04 服务器
-- 服务器有公网 IP
-- 一个已经购买好的域名
-- 域名管理后台可以添加 A 记录
-- 你能通过 SSH 登录服务器
-
-建议先准备好这些信息：
-
-- 服务器公网 IP
-- 宝塔面板准备使用的端口
-- 你的二级域名，例如 `clock.example.com`
-
-## 2. 宝塔面板官方安装脚本
-
-根据宝塔官方文档，Ubuntu / Debian 常用安装命令如下：
+如果你已经有宝塔，推荐直接用这个命令：
 
 ```bash
-if [ -f /usr/bin/curl ];then curl -sSO https://download.bt.cn/install/install_panel.sh;else wget -O install_panel.sh https://download.bt.cn/install/install_panel.sh;fi
-bash install_panel.sh ed8484bec
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-baota.sh)"
 ```
 
-安装完成后，终端会输出：
+这个脚本会做的事情只有：
 
-- 面板访问地址
-- 用户名
-- 密码
+- 检查当前服务器环境
+- 自动安装 Node.js 20
+- 下载 XMaoClock Server 项目
+- 部署到 `/www/wwwroot/XMaoClock_Server`
+- 创建并启动 `xmao-remote` 服务
+- 让服务监听在 `127.0.0.1:9230`
 
-请立刻把这些信息保存好。
+它不会做这些事：
 
-注意：如果你的服务器有云防火墙或安全组，至少要先放行：
+- 不会安装宝塔面板
+- 不会重装宝塔面板
+- 不会覆盖你的站点列表
+- 不会清空你原来的其他项目
+
+## 2. 一键部署后你还要做什么
+
+部署脚本跑完后，再去宝塔里做 4 步。
+
+### 第一步：添加一个站点
+
+进入：
 
 ```text
-22
-80
-443
-8888
+网站 -> 添加站点
 ```
 
-如果你后续要临时直连测试 9230，也请额外放行：
+建议填写：
+
+- 域名：你的域名，例如 `clock.example.com`
+- 根目录：可以填写 `/www/wwwroot/clock.example.com`
+- PHP 版本：选“纯静态”
+- 数据库：不创建
+
+这里的网站主要用于让宝塔托管域名、Nginx 和证书入口。
+
+### 第二步：配置反向代理
+
+进入：
 
 ```text
-9230
+网站 -> 你的站点 -> 设置 -> 反向代理
 ```
 
-## 3. 第一次进入宝塔面板要做什么
+新增一条代理，推荐填写：
 
-打开安装完成后显示的面板地址，例如：
+- 代理名称：`xmao-remote`
+- 目标 URL：`http://127.0.0.1:9230`
+- 发送域名：`$host`
+
+保存后，公网访问你的域名时，就会被宝塔转发到 XMaoClock 服务。
+
+### 第三步：申请 SSL 证书
+
+进入：
 
 ```text
-http://你的服务器IP:8888/xxxxx
+网站 -> 你的站点 -> SSL
 ```
 
-首次登录建议做这几件事：
+推荐直接申请：
 
-1. 修改宝塔登录密码。
-2. 绑定宝塔账号可以选做，不是必须。
-3. 在“软件商店”里安装 `Nginx`。
-4. 如果你只部署 XMaoClock Server，不需要安装 MySQL、PHP、Redis。
+- Let's Encrypt
 
-只装 `Nginx` 就够了。
+证书签发成功后，打开“强制 HTTPS”。
 
-## 4. 先在服务器里把 XMaoClock 平台跑起来
+### 第四步：浏览器打开后台
 
-宝塔只负责入口层，所以我们要先通过 SSH 把 Node 服务启动好。
+现在你就可以访问：
 
-### 第一步：安装 Node.js 20
+```text
+https://你的域名
+```
 
-SSH 登录服务器后执行：
+首次打开时：
+
+1. 设置管理员密码
+2. 登录后台
+3. 添加设备串号
+4. 回到实体设备网页填写公网域名
+
+## 3. 如果你想手动部署，而不是一键脚本
+
+### Ubuntu / Debian
 
 ```bash
 sudo apt update
 sudo apt install -y curl ca-certificates git unzip
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
-node -v
-```
 
-### 第二步：下载项目
-
-```bash
-cd /opt
+cd /www/wwwroot
 sudo git clone https://github.com/XMaoCAT/XMaoClock_Server.git
-sudo chown -R $USER:$USER /opt/XMaoClock_Server
-cd /opt/XMaoClock_Server
-```
-
-### 第三步：先运行测试一次
-
-```bash
-cd /opt/XMaoClock_Server
+sudo chown -R $USER:$USER /www/wwwroot/XMaoClock_Server
+cd /www/wwwroot/XMaoClock_Server
 node server.js
 ```
 
-然后浏览器直接访问：
+### CentOS / AlmaLinux / Rocky Linux
 
-```text
-http://你的公网IP:9230
+如果系统有 `dnf`：
+
+```bash
+sudo dnf install -y curl ca-certificates git unzip
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo dnf install -y nodejs
+
+cd /www/wwwroot
+sudo git clone https://github.com/XMaoCAT/XMaoClock_Server.git
+sudo chown -R $USER:$USER /www/wwwroot/XMaoClock_Server
+cd /www/wwwroot/XMaoClock_Server
+node server.js
 ```
 
-如果网页能打开，说明服务正常。
+如果系统只有 `yum`：
 
-按 `Ctrl + C` 停掉前台进程。
+```bash
+sudo yum install -y curl ca-certificates git unzip
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo yum install -y nodejs
 
-### 第四步：写成 systemd 服务
+cd /www/wwwroot
+sudo git clone https://github.com/XMaoCAT/XMaoClock_Server.git
+sudo chown -R $USER:$USER /www/wwwroot/XMaoClock_Server
+cd /www/wwwroot/XMaoClock_Server
+node server.js
+```
+
+能打开下面这个地址，就说明服务本体正常：
+
+```text
+http://127.0.0.1:9230
+```
+
+然后再回宝塔里做站点、反向代理和 SSL。
+
+## 4. systemd 手动注册方式
+
+如果你不想用一键脚本，也可以自己建服务。
 
 ```bash
 sudo nano /etc/systemd/system/xmao-remote.service
@@ -132,9 +175,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/opt/XMaoClock_Server
-ExecStart=/usr/bin/node /opt/XMaoClock_Server/server.js
+User=root
+WorkingDirectory=/www/wwwroot/XMaoClock_Server
+ExecStart=/usr/bin/node /www/wwwroot/XMaoClock_Server/server.js
 Restart=always
 RestartSec=3
 
@@ -142,9 +185,9 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-把 `User=ubuntu` 改成你的实际用户名。
+如果你不是 `root` 运行，请把 `User=root` 改成你的实际用户名。
 
-启动并设置开机自启：
+然后执行：
 
 ```bash
 sudo systemctl daemon-reload
@@ -153,257 +196,61 @@ sudo systemctl start xmao-remote
 sudo systemctl status xmao-remote --no-pager
 ```
 
-## 5. 在宝塔里创建网站
+## 5. 宝塔里需要注意的端口
 
-现在开始做图形化配置。
-
-### 第一步：添加网站
-
-在宝塔左侧进入：
+项目默认端口是：
 
 ```text
-网站 -> 添加站点
+9230
 ```
 
-填写建议：
+如果你只通过宝塔反向代理访问，通常不用放行 9230 公网端口，因为外部访问走的是：
 
-- 域名：`clock.example.com`
-- 根目录：随便填一个存在的目录，例如 `/www/wwwroot/clock.example.com`
-- PHP 版本：选择“纯静态”即可
-- 数据库：不要创建
+- `80`
+- `443`
 
-因为真正返回页面的是我们的 Node 服务，这个站点主要是为了给 Nginx 和 SSL 托管入口。
+只有你想直接公网访问 `http://IP:9230` 时，才需要开放 9230。
 
-### 第二步：确认域名已解析
+## 6. 设备端应该填写什么
 
-去你的域名服务商后台添加：
+推荐填写：
 
 ```text
-A 记录：clock.example.com -> 你的服务器公网IP
+https://你的域名
 ```
 
-等域名生效后，再继续下面步骤。
-
-## 6. 在宝塔里配置反向代理
-
-进入：
-
-```text
-网站 -> 你的站点 -> 设置 -> 反向代理
-```
-
-新增一条反向代理，建议这样填：
-
-- 代理名称：`xmao-remote`
-- 目标 URL：`http://127.0.0.1:9230`
-- 发送域名：`$host`
-
-保存后，宝塔会帮你把公网访问转发给本机的 Node 服务。
-
-如果你不放心，可以打开该站点的 Nginx 配置，确认里面存在类似：
-
-```nginx
-location / {
-    proxy_pass http://127.0.0.1:9230;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-## 7. 在宝塔里申请 SSL 证书
-
-进入：
-
-```text
-网站 -> 你的站点 -> 设置 -> SSL
-```
-
-推荐选择：
-
-- `Let's Encrypt`
-
-然后：
-
-1. 勾选你的域名
-2. 点击申请
-3. 申请成功后打开“强制 HTTPS”
-
-这样以后浏览器访问和设备端填写的地址都可以直接用：
+例如：
 
 ```text
 https://clock.example.com
 ```
 
-## 8. 宝塔防火墙和云安全组怎么开
+不要填 `127.0.0.1`，那是服务器本地回环地址，只给宝塔反向代理内部使用。
 
-### 宝塔面板里的系统防火墙
+## 7. 如果你已经部署过旧版本
 
-进入：
-
-```text
-安全
-```
-
-确认至少放行：
-
-- `80`
-- `443`
-- `22`
-- `8888`
-
-### 云厂商安全组
-
-如果你是阿里云、腾讯云、华为云、AWS、Vultr、DigitalOcean 等服务器，也要同时在安全组里放行：
-
-- `80/tcp`
-- `443/tcp`
-- `22/tcp`
-- `8888/tcp`
-- 如果临时调试直连，还可放 `9230/tcp`
-
-## 9. 后台和物理设备如何配合
-
-完成以上步骤后，按下面顺序：
-
-1. 浏览器访问 `https://你的域名`
-2. 首次设置后台密码
-3. 登录后台
-4. 添加设备串号
-5. 回到物理设备本地网页
-6. 在设备串号下方填写：`https://你的域名`
-7. 点击保存
-8. 设备成功握手后，后台就会显示该设备在线状态
-9. 以后你在手机外网打开 `https://你的域名` 登录后台，就能控制设备
-
-## 10. 宝塔环境如何切换后台监听端口
-
-如果你要把后台服务从默认的 `9230` 改成别的端口，例如 `9527`，要同时改服务配置和反向代理目标。
-
-### 第一步：修改服务配置
-
-SSH 登录服务器后执行：
+可以直接再次运行：
 
 ```bash
-sudo nano /opt/XMaoClock_Server/config.json
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-baota.sh)"
 ```
 
-把：
+脚本会保留：
 
-```json
-{
-  "host": "0.0.0.0",
-  "port": 9230
-}
-```
+- `config.json`
+- `data/store.json`
 
-改成：
+也就是说：
 
-```json
-{
-  "host": "0.0.0.0",
-  "port": 9527
-}
-```
+- 后台密码会保留
+- 已绑定设备会保留
+- 历史数据会保留
 
-保存后重启服务：
+## 8. 最后一句最关键
 
-```bash
-sudo systemctl restart xmao-remote
-sudo systemctl status xmao-remote --no-pager
-```
+在“已有宝塔”的前提下，XMaoClock 应该被当成一个普通项目部署：
 
-### 第二步：修改宝塔反向代理目标
+- 宝塔负责域名、Nginx、SSL、入口
+- XMaoClock 负责业务服务本体
 
-进入：
-
-```text
-网站 -> 你的站点 -> 设置 -> 反向代理
-```
-
-把目标 URL 从：
-
-```text
-http://127.0.0.1:9230
-```
-
-改成：
-
-```text
-http://127.0.0.1:9527
-```
-
-### 第三步：如果你直连端口调试，也要放行新端口
-
-```bash
-sudo ufw allow 9527/tcp
-sudo ufw reload
-```
-
-### 第四步：如果设备不是通过域名访问，而是直连端口
-
-那设备端也要改成：
-
-```text
-http://你的公网IP:9527
-```
-
-## 11. 宝塔环境下如何更新项目
-
-SSH 登录服务器后执行：
-
-```bash
-cd /opt/XMaoClock_Server
-git pull
-sudo systemctl restart xmao-remote
-sudo systemctl status xmao-remote --no-pager
-```
-
-如果你是重新执行一键安装脚本：
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-ubuntu.sh)"
-```
-
-脚本会保留 `config.json` 与 `data/store.json`。
-
-## 12. 常见问题
-
-### 宝塔里网站能打开，但页面显示 502 / 504
-
-先检查 Node 服务是否真的在运行：
-
-```bash
-sudo systemctl status xmao-remote --no-pager
-sudo journalctl -u xmao-remote -f
-```
-
-### 域名能打开后台，但设备握手失败
-
-优先检查：
-
-1. 后台有没有添加这个设备串号
-2. 设备填的是不是完整的 `https://域名`
-3. SSL 证书是否正常签发
-4. 域名是否真的解析到了这台服务器
-
-### 设备说“貌似没有正确在公网配置设备”
-
-这不是域名问题，而是后台还没有绑定该设备串号。
-
-### 我能不能不装宝塔，只装平台
-
-可以。那就直接看：
-
-- [README-ubuntu.md](./README-ubuntu.md)
-- [README-docker.md](./README-docker.md)
-
-## 13. 官方参考页面
-
-为了和宝塔当前界面保持一致，你也可以对照官方文档：
-
-- 安装宝塔面板：`https://docs.bt.cn/10.0/getting-started/quick-installation-of-bt-panel`
-- 创建站点：`https://docs.bt.cn/getting-started/create-web`
-
+两者是配合关系，不是“为了 XMaoClock 必须重新装一套宝塔”的关系。

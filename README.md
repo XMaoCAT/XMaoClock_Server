@@ -27,7 +27,7 @@ XMaoClock 的公网远程控制平台。
 | Ubuntu 云服务器 | [README-ubuntu.md](./README-ubuntu.md) | 最常见、最稳 | 适合长期在线 |
 | Windows 公网电脑 | [README-windows.md](./README-windows.md) | 家里闲置电脑 / Windows VPS | 上手简单 |
 | Docker / Docker Compose | [README-docker.md](./README-docker.md) | 喜欢容器化的人 | 迁移方便，升级方便 |
-| 宝塔面板 + 域名 + HTTPS | [README-baota.md](./README-baota.md) | 新手想图形化配置域名和证书 | 面板操作直观 |
+| 已有宝塔面板 + 域名 + HTTPS | [README-baota.md](./README-baota.md) | 已经在用宝塔的人 | 直接当普通 Node 项目部署 |
 | 只想看接口 | [API.md](./API.md) | 设备开发 / 二次开发 | 请求与响应说明 |
 
 ## 2. 最快跑通流程
@@ -49,9 +49,9 @@ XMaoClock 的公网远程控制平台。
 
 ## 3. 一键部署命令
 
-### Ubuntu 一键部署
+### Linux 一键部署
 
-在 Ubuntu 22.04 / 24.04 上执行：
+在 Ubuntu / Debian / CentOS / AlmaLinux / Rocky Linux 上执行：
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-ubuntu.sh)"
@@ -60,6 +60,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 一键脚本会自动：
 
 - 安装 Node.js 20
+- 自动识别 `apt` / `dnf` / `yum`
 - 下载仓库到 `/opt/XMaoClock_Server`
 - 创建并启动 `xmao-remote.service`
 - 默认监听 `9230`
@@ -70,6 +71,23 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 ```text
 http://你的服务器公网IP:9230
 ```
+
+### 宝塔现有环境一键部署
+
+如果你的服务器已经装好了宝塔，不要重装面板，直接执行：
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/install-baota.sh)"
+```
+
+这个脚本会：
+
+- 不安装、不重装宝塔面板
+- 自动安装 Node.js 20
+- 把项目部署到 `/www/wwwroot/XMaoClock_Server`
+- 创建 `xmao-remote` 服务
+- 默认监听 `127.0.0.1:9230`
+- 方便你在宝塔里用反向代理接入域名
 
 ### Windows 一键部署
 
