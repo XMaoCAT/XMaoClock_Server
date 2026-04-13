@@ -50,6 +50,16 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function logEvent(scope, message, details = '') {
+  const suffix = details ? ` ${details}` : '';
+  console.log(`[${nowIso()}] [${scope}] ${message}${suffix}`);
+}
+
+function previewText(value, limit = 180) {
+  const text = String(value || '');
+  return text.length <= limit ? text : `${text.slice(0, limit)}...`;
+}
+
 function sha256(input) {
   return crypto.createHash('sha256').update(String(input)).digest('hex');
 }
@@ -502,6 +512,11 @@ function applyCommandResults(device, resultsInput) {
     target.resultMessage = String(result.message || '');
     target.executedAt = nowIso();
     device.pendingQueue = (Array.isArray(device.pendingQueue) ? device.pendingQueue : []).filter(id => id !== commandId);
+    logEvent(
+      'RemoteResult',
+      `设备 ${device.serial} 回报指令结果`,
+      `commandId=${commandId} status=${target.status} message=${previewText(target.resultMessage, 120)}`
+    );
     touched = true;
   });
 
@@ -853,6 +868,11 @@ async function handleAdminCommand(req, res, params) {
   }
 
   const queued = queueCommand(device, command.type, command.params);
+  logEvent(
+    'AdminCommand',
+    `已为设备 ${device.serial} 加入远程命令`,
+    `type=${queued.type} commandId=${queued.id} alias=${previewText(device.alias, 40)}`
+  );
   sendJson(res, 200, { status: 'success', message: '命令已加入队列，等待设备下次心跳拉取', command: queued });
 }
 
@@ -921,6 +941,11 @@ async function handleDeviceHandshake(req, res) {
     alias: device.alias,
     pollIntervalMs: clamp(config.devicePollIntervalMs, 5000, 60000, 8000)
   });
+  logEvent(
+    'Handshake',
+    `设备握手成功`,
+    `serial=${device.serial} alias=${previewText(device.alias, 40)} ip=${device.wifiIp || '-'}`
+  );
 }
 
 async function handleDeviceHeartbeat(req, res) {
@@ -952,6 +977,20 @@ async function handleDeviceHeartbeat(req, res) {
 
   const commands = buildDispatchCommands(device);
   saveStore();
+
+  if (commands.length > 0) {
+    logEvent(
+      'Heartbeat',
+      `设备 ${device.serial} 拉取到 ${commands.length} 条命令`,
+      commands.map(command => `${command.type}:${command.id}`).join(', ')
+    );
+  } else {
+    logEvent(
+      'Heartbeat',
+      `设备 ${device.serial} 心跳成功，本次无新命令`,
+      `pendingQueue=${Array.isArray(device.pendingQueue) ? device.pendingQueue.length : 0}`
+    );
+  }
 
   sendJson(res, 200, {
     status: 'success',
@@ -986,6 +1025,11 @@ async function handleDeviceReport(req, res) {
   }
 
   applyCommandResults(device, body.resultsJson || body.results || []);
+  logEvent(
+    'Report',
+    `设备 ${device.serial} 上报执行结果`,
+    `payload=${previewText(JSON.stringify(body.resultsJson || body.results || ''), 180)}`
+  );
   sendJson(res, 200, { status: 'success', message: '执行结果已收录' });
 }
 
