@@ -9,6 +9,7 @@ const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const CONFIG_FILE = path.join(ROOT_DIR, 'config.json');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
+const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 const ONLINE_WINDOW_MS = 20000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_HISTORY = 60;
@@ -110,6 +111,11 @@ function isHexBitmap(value) {
   return /^[0-9a-fA-F]+$/.test(text);
 }
 
+function isSafeStorageFileName(value) {
+  const text = String(value || '').trim();
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/.test(text);
+}
+
 function sanitizeScheduledAlarms(input) {
   if (!Array.isArray(input)) {
     return [];
@@ -146,9 +152,30 @@ function sanitizeRgbState(input) {
   };
 }
 
+function sanitizeTask(task) {
+  return {
+    id: String(task && task.id ? task.id : '').trim(),
+    type: String(task && task.type ? task.type : '').trim(),
+    params: task && typeof task.params === 'object' && task.params ? task.params : {},
+    status: String(task && task.status ? task.status : 'queued').trim() || 'queued',
+    createdAt: String(task && task.createdAt ? task.createdAt : ''),
+    dispatchedAt: String(task && task.dispatchedAt ? task.dispatchedAt : ''),
+    processingAt: String(task && task.processingAt ? task.processingAt : ''),
+    resultMessage: String(task && task.resultMessage ? task.resultMessage : '')
+  };
+}
+
+function getTasksForDevice(serial) {
+  const normalizedSerial = normalizeSerial(serial);
+  return (Array.isArray(taskStore.tasks) ? taskStore.tasks : [])
+    .filter(task => normalizeSerial(task && task.serial) === normalizedSerial)
+    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+}
+
 function sanitizeDevice(device) {
   const lastSeenAt = device.lastSeenAt || '';
   const online = lastSeenAt ? (Date.now() - Date.parse(lastSeenAt)) < ONLINE_WINDOW_MS : false;
+  const pendingTasks = getTasksForDevice(device.serial).map(sanitizeTask);
   return {
     serial: device.serial,
     alias: device.alias,
@@ -170,7 +197,8 @@ function sanitizeDevice(device) {
     bootAnimationType: clamp(device.bootAnimationType, 1, 2, 1),
     canvasDisplayActive: !!device.canvasDisplayActive,
     canvasDisplayDuration: clamp(device.canvasDisplayDuration, 0, 86400, 0),
-    pendingQueueCount: Array.isArray(device.pendingQueue) ? device.pendingQueue.length : 0,
+    pendingQueueCount: pendingTasks.length,
+    pendingTasks,
     commandHistory: Array.isArray(device.commandHistory) ? device.commandHistory.slice(0, 12) : []
   };
 }
@@ -191,13 +219,29 @@ function createDefaultStore() {
   };
 }
 
+function createDefaultTaskStore() {
+  return {
+    tasks: []
+  };
+}
+
 ensureDir(DATA_DIR);
 ensureJsonFile(CONFIG_FILE, createDefaultConfig());
 ensureJsonFile(STORE_FILE, createDefaultStore());
+ensureJsonFile(TASKS_FILE, createDefaultTaskStore());
 
 const config = loadJson(CONFIG_FILE, createDefaultConfig());
 let store = loadJson(STORE_FILE, createDefaultStore());
+let taskStore = loadJson(TASKS_FILE, createDefaultTaskStore());
 const sessions = new Map();
+
+if (!taskStore || typeof taskStore !== 'object') {
+  taskStore = createDefaultTaskStore();
+}
+
+if (!Array.isArray(taskStore.tasks)) {
+  taskStore.tasks = [];
+}
 
 if (process.env.HOST) {
   config.host = String(process.env.HOST).trim() || config.host;
@@ -223,6 +267,10 @@ writeJson(CONFIG_FILE, config);
 
 function saveStore() {
   writeJson(STORE_FILE, store);
+}
+
+function saveTaskStore() {
+  writeJson(TASKS_FILE, taskStore);
 }
 
 function parseCookies(req) {
@@ -374,6 +422,22 @@ function getDeviceBySerial(serial) {
   return store.devices[normalizedSerial] || null;
 }
 
+function findTaskById(taskId) {
+  const normalizedId = String(taskId || '').trim();
+  return (Array.isArray(taskStore.tasks) ? taskStore.tasks : []).find(task => String(task && task.id ? task.id : '').trim() === normalizedId) || null;
+}
+
+function getTaskRetryWindowMs() {
+  const basePoll = clamp(config.devicePollIntervalMs, 5000, 60000, 8000);
+  return Math.max(4000, basePoll - 500);
+}
+
+function refreshDevicePendingQueue(device) {
+  const ids = getTasksForDevice(device.serial).map(task => task.id);
+  device.pendingQueue = ids;
+  return ids;
+}
+
 function queueCommand(device, type, params = {}) {
   const command = {
     id: createId('cmd'),
@@ -381,13 +445,28 @@ function queueCommand(device, type, params = {}) {
     params,
     status: 'queued',
     createdAt: nowIso(),
-    resultMessage: ''
+    resultMessage: '任务已写入云端任务队列，等待设备下一次同步拉取'
+  };
+
+  const task = {
+    id: command.id,
+    serial: device.serial,
+    type,
+    params,
+    status: 'queued',
+    createdAt: command.createdAt,
+    dispatchedAt: '',
+    processingAt: '',
+    resultMessage: command.resultMessage,
+    deliveryAttempts: 0
   };
 
   device.commandHistory.unshift(command);
   device.commandHistory = device.commandHistory.slice(0, MAX_HISTORY);
-  device.pendingQueue.push(command.id);
+  taskStore.tasks.push(task);
+  refreshDevicePendingQueue(device);
   saveStore();
+  saveTaskStore();
   return command;
 }
 
@@ -396,30 +475,7 @@ function findCommand(device, commandId) {
 }
 
 function cleanupPendingQueue(device) {
-  const nextQueue = [];
-  const seen = new Set();
-
-  (Array.isArray(device.pendingQueue) ? device.pendingQueue : []).forEach(id => {
-    const commandId = String(id || '').trim();
-    if (!commandId || seen.has(commandId)) {
-      return;
-    }
-
-    const command = findCommand(device, commandId);
-    if (!command) {
-      return;
-    }
-
-    if (command.status === 'success' || command.status === 'error') {
-      return;
-    }
-
-    seen.add(commandId);
-    nextQueue.push(commandId);
-  });
-
-  device.pendingQueue = nextQueue;
-  return nextQueue;
+  return refreshDevicePendingQueue(device);
 }
 
 function shouldDispatchCommand(command) {
@@ -440,30 +496,35 @@ function shouldDispatchCommand(command) {
     return true;
   }
 
-  return (Date.now() - dispatchedAtMs) >= getCommandRetryWindowMs();
+  return (Date.now() - dispatchedAtMs) >= getTaskRetryWindowMs();
 }
 
 function buildDispatchCommands(device) {
   const dispatchedAt = nowIso();
 
-  return cleanupPendingQueue(device)
-    .map(id => findCommand(device, id))
+  return getTasksForDevice(device.serial)
     .filter(shouldDispatchCommand)
+    .slice(0, 1)
     .map(command => {
       command.status = 'sent';
       command.dispatchedAt = dispatchedAt;
       command.deliveryAttempts = Number(command.deliveryAttempts || 0) + 1;
+      command.resultMessage = command.deliveryAttempts > 1
+        ? '设备尚未确认开始执行，服务器已重新投递该任务'
+        : '任务已投递，等待设备确认开始执行';
+      const historyItem = findCommand(device, command.id);
+      if (historyItem) {
+        historyItem.status = 'sent';
+        historyItem.dispatchedAt = dispatchedAt;
+        historyItem.deliveryAttempts = command.deliveryAttempts;
+        historyItem.resultMessage = command.resultMessage;
+      }
       return {
         id: command.id,
         type: command.type,
         params: command.params || {}
       };
     });
-}
-
-function getCommandRetryWindowMs() {
-  const basePoll = clamp(config.devicePollIntervalMs, 5000, 60000, 8000);
-  return Math.max(4000, basePoll - 500);
 }
 
 function parseResultsInput(input) {
@@ -493,6 +554,140 @@ function parseResultsInput(input) {
   return [];
 }
 
+function applyTaskStarted(device, resultsInput) {
+  const results = parseResultsInput(resultsInput);
+  let touched = false;
+
+  results.forEach(result => {
+    const commandId = String(result.commandId || result.id || '').trim();
+    if (!commandId) {
+      return;
+    }
+
+    const task = findTaskById(commandId);
+    if (!task || normalizeSerial(task.serial) !== device.serial) {
+      return;
+    }
+
+    const message = String(result.message || '').trim() || '设备已接收任务，准备开始处理';
+    task.status = 'processing';
+    task.processingAt = nowIso();
+    task.resultMessage = message;
+
+    const historyItem = findCommand(device, commandId);
+    if (historyItem) {
+      historyItem.status = 'processing';
+      historyItem.processingAt = task.processingAt;
+      historyItem.resultMessage = message;
+    }
+
+    logEvent(
+      'RemoteTask',
+      `设备 ${device.serial} 已开始处理任务`,
+      `taskId=${commandId} type=${task.type} message=${previewText(message, 120)}`
+    );
+    touched = true;
+  });
+
+  if (touched) {
+    refreshDevicePendingQueue(device);
+    saveTaskStore();
+    saveStore();
+  }
+}
+
+function applyTaskCompletion(device, resultsInput) {
+  const results = parseResultsInput(resultsInput);
+  let touched = false;
+
+  results.forEach(result => {
+    const commandId = String(result.commandId || result.id || '').trim();
+    if (!commandId) {
+      return;
+    }
+
+    const task = findTaskById(commandId);
+    if (!task || normalizeSerial(task.serial) !== device.serial) {
+      return;
+    }
+
+    const resultStatus = String(result.status || '').trim().toLowerCase();
+    const hasExplicitSuccess = typeof result.success === 'boolean';
+    const finalSuccess = hasExplicitSuccess ? !!result.success : resultStatus !== 'error';
+    const finalStatus = finalSuccess ? 'success' : 'error';
+    const message = String(result.message || '').trim() || (finalSuccess ? '任务执行成功' : '任务执行失败');
+    const executedAt = nowIso();
+
+    const historyItem = findCommand(device, commandId);
+    if (historyItem) {
+      historyItem.status = finalStatus;
+      historyItem.resultMessage = message;
+      historyItem.executedAt = executedAt;
+    }
+
+    taskStore.tasks = taskStore.tasks.filter(item => item.id !== commandId);
+    logEvent(
+      'RemoteTask',
+      `设备 ${device.serial} 已完成任务`,
+      `taskId=${commandId} type=${task.type} status=${finalStatus} message=${previewText(message, 120)}`
+    );
+    touched = true;
+  });
+
+  if (touched) {
+    refreshDevicePendingQueue(device);
+    saveTaskStore();
+    saveStore();
+  }
+}
+
+function cancelTask(device, taskId, reason = '任务已取消') {
+  const normalizedId = String(taskId || '').trim();
+  if (!normalizedId) {
+    return false;
+  }
+
+  const task = findTaskById(normalizedId);
+  if (!task || normalizeSerial(task.serial) !== device.serial) {
+    return false;
+  }
+
+  const historyItem = findCommand(device, normalizedId);
+  if (historyItem) {
+    historyItem.status = 'cancelled';
+    historyItem.resultMessage = reason;
+    historyItem.executedAt = nowIso();
+  }
+
+  taskStore.tasks = taskStore.tasks.filter(item => item.id !== normalizedId);
+  refreshDevicePendingQueue(device);
+  saveTaskStore();
+  saveStore();
+  return true;
+}
+
+function cancelAllTasks(device) {
+  const tasks = getTasksForDevice(device.serial);
+  if (tasks.length === 0) {
+    return 0;
+  }
+
+  tasks.forEach(task => {
+    const historyItem = findCommand(device, task.id);
+    if (historyItem) {
+      historyItem.status = 'cancelled';
+      historyItem.resultMessage = '任务已批量取消';
+      historyItem.executedAt = nowIso();
+    }
+  });
+
+  taskStore.tasks = taskStore.tasks.filter(task => normalizeSerial(task.serial) !== device.serial);
+  refreshDevicePendingQueue(device);
+  saveTaskStore();
+  saveStore();
+  return tasks.length;
+}
+
 function applyCommandResults(device, resultsInput) {
   const results = parseResultsInput(resultsInput);
   let touched = false;
@@ -504,24 +699,60 @@ function applyCommandResults(device, resultsInput) {
     }
 
     const target = findCommand(device, commandId);
-    if (!target) {
+    const task = findTaskById(commandId);
+    if (!target && !task) {
       return;
     }
 
-    target.status = result.success ? 'success' : 'error';
-    target.resultMessage = String(result.message || '');
-    target.executedAt = nowIso();
-    device.pendingQueue = (Array.isArray(device.pendingQueue) ? device.pendingQueue : []).filter(id => id !== commandId);
+    const resultStatus = String(result.status || '').trim().toLowerCase();
+    const message = String(result.message || '').trim();
+
+    if (resultStatus === 'processing' || resultStatus === 'received' || resultStatus === 'acknowledged') {
+      const processingAt = nowIso();
+      if (target) {
+        target.status = 'processing';
+        target.resultMessage = message || '设备已接收指令，正在开始处理';
+        target.processingAt = processingAt;
+      }
+      if (task) {
+        task.status = 'processing';
+        task.resultMessage = message || '设备已接收指令，正在开始处理';
+        task.processingAt = processingAt;
+      }
+      logEvent(
+        'RemoteAck',
+        `设备 ${device.serial} 已确认收到指令`,
+        `commandId=${commandId} status=processing message=${previewText(message || '设备已接收指令，正在开始处理', 120)}`
+      );
+      touched = true;
+      return;
+    }
+
+    const hasExplicitSuccess = typeof result.success === 'boolean';
+    const hasFinalStatus = resultStatus === 'success' || resultStatus === 'error';
+    if (!hasExplicitSuccess && !hasFinalStatus) {
+      return;
+    }
+
+    const finalSuccess = hasExplicitSuccess ? !!result.success : resultStatus === 'success';
+    if (target) {
+      target.status = finalSuccess ? 'success' : 'error';
+      target.resultMessage = message;
+      target.executedAt = nowIso();
+    }
+    taskStore.tasks = taskStore.tasks.filter(item => item.id !== commandId);
+    refreshDevicePendingQueue(device);
     logEvent(
       'RemoteResult',
       `设备 ${device.serial} 回报指令结果`,
-      `commandId=${commandId} status=${target.status} message=${previewText(target.resultMessage, 120)}`
+      `commandId=${commandId} status=${finalSuccess ? 'success' : 'error'} message=${previewText(message, 120)}`
     );
     touched = true;
   });
 
   if (touched) {
     cleanupPendingQueue(device);
+    saveTaskStore();
     saveStore();
   }
 }
@@ -728,16 +959,7 @@ async function handleAdminCommand(req, res, params) {
   const rawParams = body.params || {};
   let command = null;
 
-  if (type === 'restart') {
-    command = commandShape('restart', {});
-  } else if (type === 'ping') {
-    command = commandShape('ping', {});
-  } else if (type === 'sync_time') {
-    command = commandShape('sync_time', {
-      epochMs: Number(rawParams.epochMs || Date.now()),
-      timezoneOffsetMinutes: Number(rawParams.timezoneOffsetMinutes || new Date().getTimezoneOffset())
-    });
-  } else if (type === 'start_pin') {
+  if (type === 'start_pin') {
     command = commandShape('start_pin', {
       pin: clamp(rawParams.pin, 0, 39, -1),
       seconds: clamp(rawParams.seconds, 1, 600, 3)
@@ -749,10 +971,6 @@ async function handleAdminCommand(req, res, params) {
   } else if (type === 'close_pin') {
     command = commandShape('close_pin', {
       pin: clamp(rawParams.pin, 0, 39, -1)
-    });
-  } else if (type === 'set_ap_broadcast') {
-    command = commandShape('set_ap_broadcast', {
-      enabled: !!rawParams.enabled
     });
   } else if (type === 'add_alarm') {
     command = commandShape('add_alarm', {
@@ -771,36 +989,28 @@ async function handleAdminCommand(req, res, params) {
     command = commandShape('stop_alarm', {
       id: String(rawParams.id || '').trim()
     });
-  } else if (type === 'set_rgb_color') {
-    command = commandShape('set_rgb_color', {
-      r: clamp(rawParams.r, 0, 255, -1),
-      g: clamp(rawParams.g, 0, 255, -1),
-      b: clamp(rawParams.b, 0, 255, -1)
+  } else if (type === 'piano_play_note') {
+    command = commandShape('piano_play_note', {
+      note: String(rawParams.note || '').trim().toUpperCase(),
+      durationMs: clamp(rawParams.durationMs, 50, 20000, 500)
     });
-  } else if (type === 'set_rgb_brightness') {
-    command = commandShape('set_rgb_brightness', {
-      brightness: clamp(rawParams.brightness, 0, 100, -1)
+  } else if (type === 'piano_play_melody') {
+    command = commandShape('piano_play_melody', {
+      name: String(rawParams.name || '').trim()
     });
-  } else if (type === 'set_rgb_mode') {
-    command = commandShape('set_rgb_mode', {
-      mode: String(rawParams.mode || '').trim(),
-      color: String(rawParams.color || '').trim()
+  } else if (type === 'storage_write_text') {
+    command = commandShape('storage_write_text', {
+      fileName: String(rawParams.fileName || '').trim(),
+      content: String(rawParams.content || '')
     });
-  } else if (type === 'set_boot_animation') {
-    command = commandShape('set_boot_animation', {
-      type: clamp(rawParams.type, 1, 2, 0)
+  } else if (type === 'storage_delete_file') {
+    command = commandShape('storage_delete_file', {
+      fileName: String(rawParams.fileName || '').trim()
     });
-  } else if (type === 'canvas_upload') {
-    command = commandShape('canvas_upload', {
-      bitmapHex: String(rawParams.bitmapHex || '').trim(),
-      duration: clamp(rawParams.duration, 0, 86400, 0)
-    });
-  } else if (type === 'canvas_end') {
-    command = commandShape('canvas_end', {});
   }
 
   if (!command) {
-    sendJson(res, 400, { status: 'error', message: '不支持的命令类型' });
+    sendJson(res, 400, { status: 'error', message: '当前公网平台只支持闹钟、钢琴、存储和引脚激活相关任务' });
     return;
   }
 
@@ -834,46 +1044,78 @@ async function handleAdminCommand(req, res, params) {
     return;
   }
 
-  if (command.type === 'set_rgb_color' && (command.params.r < 0 || command.params.g < 0 || command.params.b < 0)) {
-    sendJson(res, 400, { status: 'error', message: 'RGB 颜色值必须在 0 到 255 之间' });
+  if (command.type === 'piano_play_note' && !/^[A-G][3-5]$/.test(command.params.note)) {
+    sendJson(res, 400, { status: 'error', message: '钢琴音符仅支持 C3-B5 这一类格式，例如 C4、A4、C5' });
     return;
   }
 
-  if (command.type === 'set_rgb_brightness' && command.params.brightness < 0) {
-    sendJson(res, 400, { status: 'error', message: '亮度必须在 0 到 100 之间' });
+  if (command.type === 'piano_play_melody' && !command.params.name) {
+    sendJson(res, 400, { status: 'error', message: '请填写要播放的旋律名称' });
     return;
   }
 
-  if (command.type === 'set_rgb_mode') {
-    if (!['off', 'spectrum', 'preset'].includes(command.params.mode)) {
-      sendJson(res, 400, { status: 'error', message: 'RGB 模式必须是 off、spectrum 或 preset' });
+  if (command.type === 'storage_write_text') {
+    if (!isSafeStorageFileName(command.params.fileName)) {
+      sendJson(res, 400, { status: 'error', message: '文件名只能包含字母、数字、点、下划线和短横线，且必须以字母或数字开头' });
       return;
     }
-    if (command.params.mode === 'preset' && !['red', 'green', 'blue'].includes(command.params.color)) {
-      sendJson(res, 400, { status: 'error', message: 'RGB 预设颜色必须是 red、green 或 blue' });
+    if (command.params.content.length === 0) {
+      sendJson(res, 400, { status: 'error', message: '要写入的文本内容不能为空' });
+      return;
+    }
+    if (command.params.content.length > 16384) {
+      sendJson(res, 400, { status: 'error', message: '文本内容过长，请控制在 16KB 以内' });
       return;
     }
   }
 
-  if (command.type === 'set_boot_animation' && ![1, 2].includes(command.params.type)) {
-    sendJson(res, 400, { status: 'error', message: '开机动画类型仅支持 1 或 2' });
+  if (command.type === 'storage_delete_file' && !isSafeStorageFileName(command.params.fileName)) {
+    sendJson(res, 400, { status: 'error', message: '请填写有效的文件名后再删除' });
     return;
-  }
-
-  if (command.type === 'canvas_upload') {
-    if (command.params.bitmapHex.length !== 2048 || !isHexBitmap(command.params.bitmapHex)) {
-      sendJson(res, 400, { status: 'error', message: '画板位图格式无效，应为 128x64 的十六进制位图' });
-      return;
-    }
   }
 
   const queued = queueCommand(device, command.type, command.params);
   logEvent(
-    'AdminCommand',
-    `已为设备 ${device.serial} 加入远程命令`,
-    `type=${queued.type} commandId=${queued.id} alias=${previewText(device.alias, 40)}`
+    'AdminTask',
+    `已为设备 ${device.serial} 加入远程任务`,
+    `type=${queued.type} taskId=${queued.id} alias=${previewText(device.alias, 40)}`
   );
-  sendJson(res, 200, { status: 'success', message: '命令已加入队列，等待设备下次心跳拉取', command: queued });
+  sendJson(res, 200, { status: 'success', message: '任务已加入 tasks.json 队列，等待设备通过任务 API 拉取', command: queued });
+}
+
+function handleAdminCancelTask(req, res, params) {
+  if (!requireAdmin(req, res)) {
+    return;
+  }
+
+  const device = getDeviceBySerial(params.serial);
+  if (!device) {
+    sendJson(res, 404, { status: 'error', message: '未找到该设备' });
+    return;
+  }
+
+  const ok = cancelTask(device, params.taskId, '任务已由后台手动取消');
+  if (!ok) {
+    sendJson(res, 404, { status: 'error', message: '未找到要取消的任务' });
+    return;
+  }
+
+  sendJson(res, 200, { status: 'success', message: '任务已取消' });
+}
+
+function handleAdminCancelAllTasks(req, res, params) {
+  if (!requireAdmin(req, res)) {
+    return;
+  }
+
+  const device = getDeviceBySerial(params.serial);
+  if (!device) {
+    sendJson(res, 404, { status: 'error', message: '未找到该设备' });
+    return;
+  }
+
+  const count = cancelAllTasks(device);
+  sendJson(res, 200, { status: 'success', message: count > 0 ? `已取消 ${count} 条任务` : '当前没有待取消的任务' });
 }
 
 function handleAdminDeleteDevice(req, res, params) {
@@ -888,6 +1130,8 @@ function handleAdminDeleteDevice(req, res, params) {
   }
 
   delete store.devices[serial];
+  taskStore.tasks = taskStore.tasks.filter(task => normalizeSerial(task.serial) !== serial);
+  saveTaskStore();
   saveStore();
   sendJson(res, 200, { status: 'success', message: '设备绑定已删除' });
 }
@@ -972,35 +1216,72 @@ async function handleDeviceHeartbeat(req, res) {
     return;
   }
 
-  applyCommandResults(device, body.pendingResultsJson || body.pendingResults || []);
   updateDeviceHeartbeat(device, body);
+  refreshDevicePendingQueue(device);
+  saveStore();
+  logEvent(
+    'Heartbeat',
+    `设备 ${device.serial} 心跳成功，已同步状态`,
+    `pendingTasks=${getTasksForDevice(device.serial).length}`
+  );
 
-  const commands = buildDispatchCommands(device);
+  sendJson(res, 200, {
+    status: 'success',
+    message: '云端在线，等待下一次任务同步',
+    pollIntervalMs: clamp(config.devicePollIntervalMs, 5000, 60000, 8000)
+  });
+}
+
+function validateDeviceToken(serial, token, res) {
+  const device = getDeviceBySerial(serial);
+  if (!device) {
+    sendJson(res, 403, { status: 'error', message: '公网平台未配置该设备串号' });
+    return null;
+  }
+
+  if (!device.deviceToken || device.deviceToken !== token) {
+    sendJson(res, 401, { status: 'error', message: '设备令牌无效，请重新握手' });
+    return null;
+  }
+
+  return device;
+}
+
+function handleDeviceTaskFetch(req, res, requestUrl) {
+  const serial = normalizeSerial(requestUrl.searchParams.get('serial') || '');
+  const token = String(requestUrl.searchParams.get('deviceToken') || '').trim();
+  if (!serial || !token) {
+    sendJson(res, 400, { status: 'error', message: '缺少串号或设备令牌' });
+    return;
+  }
+
+  const device = validateDeviceToken(serial, token, res);
+  if (!device) {
+    return;
+  }
+
+  const tasks = buildDispatchCommands(device);
+  refreshDevicePendingQueue(device);
+  saveTaskStore();
   saveStore();
 
-  if (commands.length > 0) {
+  if (tasks.length > 0) {
     logEvent(
-      'Heartbeat',
-      `设备 ${device.serial} 拉取到 ${commands.length} 条命令`,
-      commands.map(command => `${command.type}:${command.id}`).join(', ')
-    );
-  } else {
-    logEvent(
-      'Heartbeat',
-      `设备 ${device.serial} 心跳成功，本次无新命令`,
-      `pendingQueue=${Array.isArray(device.pendingQueue) ? device.pendingQueue.length : 0}`
+      'TaskFetch',
+      `设备 ${device.serial} 拉取到 ${tasks.length} 条任务`,
+      tasks.map(task => `${task.type}:${task.id}`).join(', ')
     );
   }
 
   sendJson(res, 200, {
     status: 'success',
-    message: '云端在线，等待下一次控制指令',
+    tasks,
     pollIntervalMs: clamp(config.devicePollIntervalMs, 5000, 60000, 8000),
-    commands
+    message: tasks.length > 0 ? '已返回待执行任务' : '当前没有待执行任务'
   });
 }
 
-async function handleDeviceReport(req, res) {
+async function handleDeviceTaskStarted(req, res) {
   const body = await readJsonBody(req, res);
   if (!body) {
     return;
@@ -1013,24 +1294,45 @@ async function handleDeviceReport(req, res) {
     return;
   }
 
-  const device = getDeviceBySerial(serial);
+  const device = validateDeviceToken(serial, token, res);
   if (!device) {
-    sendJson(res, 403, { status: 'error', message: '公网平台未配置该设备串号' });
     return;
   }
 
-  if (!device.deviceToken || device.deviceToken !== token) {
-    sendJson(res, 401, { status: 'error', message: '设备令牌无效，请重新握手' });
-    return;
-  }
-
-  applyCommandResults(device, body.resultsJson || body.results || []);
+  applyTaskStarted(device, body.resultsJson || body.results || []);
   logEvent(
-    'Report',
-    `设备 ${device.serial} 上报执行结果`,
+    'TaskStarted',
+    `设备 ${device.serial} 上报任务已开始处理`,
     `payload=${previewText(JSON.stringify(body.resultsJson || body.results || ''), 180)}`
   );
-  sendJson(res, 200, { status: 'success', message: '执行结果已收录' });
+  sendJson(res, 200, { status: 'success', message: '任务开始状态已收录' });
+}
+
+async function handleDeviceTaskComplete(req, res) {
+  const body = await readJsonBody(req, res);
+  if (!body) {
+    return;
+  }
+
+  const serial = normalizeSerial(body.serial);
+  const token = String(body.deviceToken || '').trim();
+  if (!serial || !token) {
+    sendJson(res, 400, { status: 'error', message: '缺少串号或设备令牌' });
+    return;
+  }
+
+  const device = validateDeviceToken(serial, token, res);
+  if (!device) {
+    return;
+  }
+
+  applyTaskCompletion(device, body.resultsJson || body.results || []);
+  logEvent(
+    'TaskComplete',
+    `设备 ${device.serial} 上报任务完成结果`,
+    `payload=${previewText(JSON.stringify(body.resultsJson || body.results || ''), 180)}`
+  );
+  sendJson(res, 200, { status: 'success', message: '任务完成结果已收录，并已从 tasks.json 队列删除' });
 }
 
 function handleBootstrap(req, res) {
@@ -1093,6 +1395,18 @@ async function routeRequest(req, res) {
     return;
   }
 
+  params = matchRoute(pathname, '/api/admin/devices/:serial/tasks/:taskId');
+  if (req.method === 'DELETE' && params) {
+    handleAdminCancelTask(req, res, params);
+    return;
+  }
+
+  params = matchRoute(pathname, '/api/admin/devices/:serial/tasks');
+  if (req.method === 'DELETE' && params) {
+    handleAdminCancelAllTasks(req, res, params);
+    return;
+  }
+
   params = matchRoute(pathname, '/api/admin/devices/:serial');
   if (req.method === 'DELETE' && params) {
     handleAdminDeleteDevice(req, res, params);
@@ -1109,8 +1423,23 @@ async function routeRequest(req, res) {
     return;
   }
 
+  if (req.method === 'GET' && pathname === '/api/device/tasks') {
+    handleDeviceTaskFetch(req, res, requestUrl);
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/device/tasks/started') {
+    await handleDeviceTaskStarted(req, res);
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/device/tasks/complete') {
+    await handleDeviceTaskComplete(req, res);
+    return;
+  }
+
   if (req.method === 'POST' && pathname === '/api/device/report') {
-    await handleDeviceReport(req, res);
+    await handleDeviceTaskComplete(req, res);
     return;
   }
 

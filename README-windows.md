@@ -29,7 +29,7 @@ powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubus
 - 创建开机自启任务 `XMaoClock Remote Hub`
 - 开放 Windows 防火墙 `9230`
 - 启动服务
-- 保留旧的 `config.json` 与 `data\store.json`
+- 保留旧的 `config.json`、`data\store.json` 与 `data\tasks.json`
 
 执行完成后访问：
 
@@ -350,7 +350,7 @@ git pull
 powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/update-windows.ps1 | iex"
 ```
 
-这个命令会自动拉取最新网页与服务端代码，并保留旧的 `config.json` 与 `data\store.json`。
+这个命令会自动拉取最新网页与服务端代码，并保留旧的 `config.json`、`data\store.json` 与 `data\tasks.json`。
 
 ## 13. 备份与重置
 
@@ -359,6 +359,7 @@ powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubus
 ```powershell
 Copy-Item C:\XMaoClock_Server\config.json C:\XMaoClock_Server\config.backup.json -Force
 Copy-Item C:\XMaoClock_Server\data\store.json C:\XMaoClock_Server\data\store.backup.json -Force
+Copy-Item C:\XMaoClock_Server\data\tasks.json C:\XMaoClock_Server\data\tasks.backup.json -Force
 ```
 
 ### 重置
@@ -368,6 +369,7 @@ Copy-Item C:\XMaoClock_Server\data\store.json C:\XMaoClock_Server\data\store.bac
 ```powershell
 Remove-Item C:\XMaoClock_Server\config.json -Force -ErrorAction SilentlyContinue
 Remove-Item C:\XMaoClock_Server\data\store.json -Force -ErrorAction SilentlyContinue
+Remove-Item C:\XMaoClock_Server\data\tasks.json -Force -ErrorAction SilentlyContinue
 ```
 
 再重新启动 `node server.js`。
@@ -390,4 +392,5 @@ Remove-Item C:\XMaoClock_Server\data\store.json -Force -ErrorAction SilentlyCont
 ### 想不带端口号访问
 
 请使用上面的 Caddy 域名反向代理方案。
+
 

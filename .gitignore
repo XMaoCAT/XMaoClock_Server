@@ -1,5 +1,6 @@
 config.json
 data/store.json
+data/tasks.json
 .env
 .env.local
 *.log

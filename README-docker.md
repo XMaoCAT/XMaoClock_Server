@@ -16,7 +16,7 @@
 - 搬迁方便，复制目录就能迁走
 - 升级方便，重新构建镜像即可
 - 配置清晰，环境变量一眼能看懂
-- `data/store.json` 可直接持久化
+- `data/store.json` 和 `data/tasks.json` 可直接持久化
 
 ## 2. 必备文件说明
 
@@ -173,11 +173,12 @@ http://你的公网IP:9230
 
 ```text
 data/store.json
+data/tasks.json
 ```
 
 这意味着：
 
-- 你删除并重建容器，后台密码和设备列表仍然保留
+- 你删除并重建容器，后台密码、设备列表和待执行任务仍然保留
 - 你只要把整个项目目录和 `data/` 备份下来，就能迁移
 
 ## 6. 更新平台
@@ -190,7 +191,7 @@ docker compose pull
 docker compose up -d --build
 ```
 
-只要你的 `.env` 和 `data/store.json` 还在，这次更新就不会丢后台密码、设备列表和大部分运行数据。
+只要你的 `.env`、`data/store.json` 和 `data/tasks.json` 还在，这次更新就不会丢后台密码、设备列表、待执行任务和大部分运行数据。
 
 如果你已经是 Git 克隆方式：
 
@@ -201,7 +202,7 @@ docker compose up -d --build
 
 如果你只是下载 ZIP：
 
-1. 备份旧目录中的 `.env` 与 `data/store.json`
+1. 备份旧目录中的 `.env`、`data/store.json` 与 `data/tasks.json`
 2. 替换为新版本文件
 3. 再执行：
 
@@ -350,5 +351,7 @@ docker compose up -d --build
 .env
 docker-compose.yml
 data/store.json
+data/tasks.json
 ```
+
 

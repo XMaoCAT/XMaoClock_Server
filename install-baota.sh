@@ -122,6 +122,9 @@ fi
 if [ -f "$INSTALL_DIR/data/store.json" ]; then
   $SUDO cp "$INSTALL_DIR/data/store.json" "$BACKUP_DIR/data/store.json"
 fi
+if [ -f "$INSTALL_DIR/data/tasks.json" ]; then
+  $SUDO cp "$INSTALL_DIR/data/tasks.json" "$BACKUP_DIR/data/tasks.json"
+fi
 
 echo "[6/8] 写入安装目录 $INSTALL_DIR ..."
 $SUDO rm -rf "$INSTALL_DIR"
@@ -133,6 +136,9 @@ if [ -f "$BACKUP_DIR/config.json" ]; then
 fi
 if [ -f "$BACKUP_DIR/data/store.json" ]; then
   $SUDO cp "$BACKUP_DIR/data/store.json" "$INSTALL_DIR/data/store.json"
+fi
+if [ -f "$BACKUP_DIR/data/tasks.json" ]; then
+  $SUDO cp "$BACKUP_DIR/data/tasks.json" "$INSTALL_DIR/data/tasks.json"
 fi
 $SUDO chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
 

@@ -113,6 +113,9 @@ fi
 if [ -f "$INSTALL_DIR/data/store.json" ]; then
   $SUDO cp "$INSTALL_DIR/data/store.json" "$BACKUP_DIR/data/store.json"
 fi
+if [ -f "$INSTALL_DIR/data/tasks.json" ]; then
+  $SUDO cp "$INSTALL_DIR/data/tasks.json" "$BACKUP_DIR/data/tasks.json"
+fi
 
 echo "[5/8] 写入安装目录 $INSTALL_DIR ..."
 $SUDO rm -rf "$INSTALL_DIR"
@@ -124,6 +127,9 @@ if [ -f "$BACKUP_DIR/config.json" ]; then
 fi
 if [ -f "$BACKUP_DIR/data/store.json" ]; then
   $SUDO cp "$BACKUP_DIR/data/store.json" "$INSTALL_DIR/data/store.json"
+fi
+if [ -f "$BACKUP_DIR/data/tasks.json" ]; then
+  $SUDO cp "$BACKUP_DIR/data/tasks.json" "$INSTALL_DIR/data/tasks.json"
 fi
 $SUDO chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
 
@@ -158,8 +164,8 @@ $SUDO systemctl restart "$SERVICE_NAME"
 
 echo "[8/8] 完成。"
 echo
-if [ -f "$BACKUP_DIR/config.json" ] || [ -f "$BACKUP_DIR/data/store.json" ]; then
-  echo "已保留原有 config.json 与 data/store.json。"
+if [ -f "$BACKUP_DIR/config.json" ] || [ -f "$BACKUP_DIR/data/store.json" ] || [ -f "$BACKUP_DIR/data/tasks.json" ]; then
+  echo "已保留原有 config.json、data/store.json 与 data/tasks.json。"
   echo
 fi
 echo "服务状态："

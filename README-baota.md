@@ -239,11 +239,13 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 
 - `config.json`
 - `data/store.json`
+- `data/tasks.json`
 
 也就是说：
 
 - 后台密码会保留
 - 已绑定设备会保留
+- 待执行任务会保留
 - 历史数据会保留
 
 ## 8. 最后一句最关键
@@ -254,3 +256,4 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 - XMaoClock 负责业务服务本体
 
 两者是配合关系，不是“为了 XMaoClock 必须重新装一套宝塔”的关系。
+

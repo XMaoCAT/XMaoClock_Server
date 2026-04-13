@@ -34,7 +34,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 - 下载本仓库到 `/opt/XMaoClock_Server`
 - 创建 `xmao-remote.service`
 - 自动启动服务
-- 保留旧的 `config.json` 和 `data/store.json`
+- 保留旧的 `config.json`、`data/store.json` 和 `data/tasks.json`
 
 执行完后，先试着访问：
 
@@ -467,7 +467,7 @@ sudo systemctl restart xmao-remote
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server/main/update-linux.sh)"
 ```
 
-这个命令会自动拉取最新网页与服务端代码，并保留旧的 `config.json` 与 `data/store.json`。
+这个命令会自动拉取最新网页与服务端代码，并保留旧的 `config.json`、`data/store.json` 与 `data/tasks.json`。
 
 ## 11. 备份与重置
 
@@ -478,6 +478,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 ```bash
 cp /opt/XMaoClock_Server/config.json ~/xmao-config-backup.json
 cp /opt/XMaoClock_Server/data/store.json ~/xmao-store-backup.json
+cp /opt/XMaoClock_Server/data/tasks.json ~/xmao-tasks-backup.json
 ```
 
 ### 重置整个平台
@@ -486,6 +487,7 @@ cp /opt/XMaoClock_Server/data/store.json ~/xmao-store-backup.json
 sudo systemctl stop xmao-remote
 rm -f /opt/XMaoClock_Server/config.json
 rm -f /opt/XMaoClock_Server/data/store.json
+rm -f /opt/XMaoClock_Server/data/tasks.json
 sudo systemctl start xmao-remote
 ```
 
@@ -512,4 +514,5 @@ sudo systemctl start xmao-remote
 ### 想只通过域名访问，不带 `:9230`
 
 请使用上面的 Nginx 或 Caddy 反向代理方案。
+
 

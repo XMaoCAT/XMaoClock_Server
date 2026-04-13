@@ -8,14 +8,13 @@ XMaoClock 的公网远程控制平台。
 
 - 多设备绑定与在线状态查看
 - 多设备备注名管理
-- 浏览器时间同步
-- 远程重启
-- 联网后热点广播开关
-- 计划闹钟新增、删除、清空、停止活跃闹钟
-- RGB 颜色、亮度、预设色、光谱模式
-- 开机动画切换
-- 128x64 远程画板上传与结束显示
-- GPIO `/Start`、`/Open`、`/Close`
+- 温湿度、设备时间、在线状态同步
+- 闹钟任务：新增、删除、清空、停止活跃闹钟
+- 钢琴任务：单音播放、按名称播放已存旋律
+- 存储任务：写入文本文件、删除 LittleFS 文件
+- 引脚任务：`/Start`、`/Open`、`/Close`
+- 任务队列模式：设备主动拉取、开始处理回执、完成结果回执
+- 待执行任务列表、单个取消、全部取消
 - 设备命令历史查看
 - 纯 Node.js 单文件后端，无数据库依赖
 - Docker Compose 与 GitHub Actions 已内置
@@ -64,7 +63,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/XMaoCAT/XMaoClock_Server
 - 下载仓库到 `/opt/XMaoClock_Server`
 - 创建并启动 `xmao-remote.service`
 - 默认监听 `9230`
-- 如果你之前装过，会自动保留 `config.json` 和 `data/store.json`
+- 如果你之前装过，会自动保留 `config.json`、`data/store.json` 和 `data/tasks.json`
 
 部署完成后访问：
 
@@ -103,7 +102,7 @@ powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubus
 - 下载仓库到 `C:\XMaoClock_Server`
 - 创建开机自启任务 `XMaoClock Remote Hub`
 - 放行 Windows 防火墙 `9230`
-- 如果你之前装过，会自动保留 `config.json` 和 `data\store.json`
+- 如果你之前装过，会自动保留 `config.json`、`data\store.json` 和 `data\tasks.json`
 - 立即启动服务
 
 部署完成后访问：
@@ -130,11 +129,13 @@ docker compose up -d --build
 
 - `config.json`
 - `data/store.json`
+- `data/tasks.json`
 
 也就是说：
 
 - 后台密码不会丢
 - 已绑定设备不会丢
+- 待执行任务队列不会丢
 - 命令历史和大部分运行数据不会丢
 
 ### Linux / Ubuntu / Debian / CentOS / AlmaLinux / Rocky
@@ -196,11 +197,13 @@ https://你的域名
 
 - `config.json`
 - `data/store.json`
+- `data/tasks.json`
 
 其中：
 
 - `config.json` 保存端口、主机、会话密钥等配置
 - `data/store.json` 保存管理员密码哈希、设备列表、设备令牌、命令历史
+- `data/tasks.json` 保存设备尚未完成的远程任务队列
 
 ### 如何切换端口
 
@@ -229,11 +232,12 @@ https://你的域名
 5. 设备请求 `/api/device/handshake`。
 6. 平台校验串号是否已绑定。
 7. 校验通过后，平台返回 `deviceToken`。
-8. 设备保存 `deviceToken` 并定时请求 `/api/device/heartbeat`。
-9. 管理员在后台点击按钮发送命令。
-10. 平台把命令放进设备的待执行队列。
-11. 设备下一次心跳拉取命令并执行。
-12. 设备把结果通过 `/api/device/report` 回传。
+8. 设备保存 `deviceToken` 并定时请求 `/api/device/heartbeat` 同步状态。
+9. 管理员在后台点击按钮发送任务。
+10. 平台把任务写入 `data/tasks.json` 待执行队列。
+11. 设备随后调用 `GET /api/device/tasks` 拉取任务。
+12. 设备准备开始处理前调用 `/api/device/tasks/started` 回执。
+13. 设备执行完成后调用 `/api/device/tasks/complete` 回执，服务端删除对应任务。
 
 ## 7. 更新、备份、重置
 
@@ -255,23 +259,25 @@ docker compose up -d --build
 如果你是 Ubuntu / Windows 一键脚本：
 
 - 可以再次运行一键脚本
-- 脚本会保留 `config.json` 与 `data/store.json`
+- 脚本会保留 `config.json`、`data/store.json` 与 `data/tasks.json`
 
-### 备份最重要的两个文件
+### 备份最重要的三个文件
 
 ```text
 config.json
 data/store.json
+data/tasks.json
 ```
 
-只要这两个文件还在，你的管理员密码、绑定设备和大部分状态就还在。
+只要这三个文件还在，你的管理员密码、绑定设备、待执行任务和大部分状态就还在。
 
 ### 想彻底重置平台
 
 1. 停止服务。
 2. 删除 `config.json`。
 3. 删除 `data/store.json`。
-4. 重新启动服务。
+4. 删除 `data/tasks.json`。
+5. 重新启动服务。
 
 ## 8. 仓库结构
 

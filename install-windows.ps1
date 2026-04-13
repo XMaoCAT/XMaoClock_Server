@@ -57,6 +57,9 @@ if (Test-Path (Join-Path $InstallDir 'config.json')) {
 if (Test-Path (Join-Path $InstallDir 'data\store.json')) {
     Copy-Item -Path (Join-Path $InstallDir 'data\store.json') -Destination (Join-Path $BackupDir 'data\store.json') -Force
 }
+if (Test-Path (Join-Path $InstallDir 'data\tasks.json')) {
+    Copy-Item -Path (Join-Path $InstallDir 'data\tasks.json') -Destination (Join-Path $BackupDir 'data\tasks.json') -Force
+}
 
 Write-Host "[5/8] 写入安装目录 $InstallDir ..."
 if (Test-Path $InstallDir) {
@@ -70,6 +73,9 @@ if (Test-Path (Join-Path $BackupDir 'config.json')) {
 }
 if (Test-Path (Join-Path $BackupDir 'data\store.json')) {
     Copy-Item -Path (Join-Path $BackupDir 'data\store.json') -Destination (Join-Path $InstallDir 'data\store.json') -Force
+}
+if (Test-Path (Join-Path $BackupDir 'data\tasks.json')) {
+    Copy-Item -Path (Join-Path $BackupDir 'data\tasks.json') -Destination (Join-Path $InstallDir 'data\tasks.json') -Force
 }
 
 $NodePath = (Get-Command node).Source
@@ -112,13 +118,14 @@ Start-Process -FilePath $NodePath -ArgumentList 'server.js' -WorkingDirectory $I
 
 $PreservedConfig = Test-Path (Join-Path $BackupDir 'config.json')
 $PreservedStore = Test-Path (Join-Path $BackupDir 'data\store.json')
+$PreservedTasks = Test-Path (Join-Path $BackupDir 'data\tasks.json')
 
 Remove-Item $TempRoot -Recurse -Force
 
 Write-Host ''
 Write-Host '部署完成。'
-if ($PreservedConfig -or $PreservedStore) {
-    Write-Host '已保留原有 config.json 与 data\store.json。'
+if ($PreservedConfig -or $PreservedStore -or $PreservedTasks) {
+    Write-Host '已保留原有 config.json、data\store.json 与 data\tasks.json。'
 }
 Write-Host "安装目录：$InstallDir"
 Write-Host '默认访问地址：'
