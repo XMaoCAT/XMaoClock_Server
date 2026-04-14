@@ -150,12 +150,29 @@ function commandStatusLabel(status) {
   return status || '未知状态';
 }
 
+function getVisibleHistoryEntries(history) {
+  if (!Array.isArray(history)) return [];
+  return history.filter(item => !['queued', 'sent', 'processing'].includes(String(item && item.status ? item.status : '').trim()));
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (!Number.isFinite(size) || size <= 0) return '0 B';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function renderHistory(history) {
-  if (!history || history.length === 0) return '<div class="history-empty">这里还没有任务记录，等你第一次下发任务后就会显示。</div>';
-  return history.map(item => `
+  const entries = getVisibleHistoryEntries(history);
+  if (entries.length === 0) return '<div class="history-empty">这里还没有可归档的执行记录。任务完成、失败或取消后会显示在这里。</div>';
+  return entries.map(item => `
     <div class="history-item ${escapeHtml(item.status || '')}">
-      <strong>${escapeHtml(commandTypeLabel(item.type || 'unknown'))} · ${escapeHtml(commandStatusLabel(item.status || 'queued'))}</strong>
-      <div>${escapeHtml(item.resultMessage || '任务已进入流程，等待设备后续反馈。')}</div>
+      <div class="history-item-head">
+        <strong>${escapeHtml(commandTypeLabel(item.type || 'unknown'))} · ${escapeHtml(commandStatusLabel(item.status || 'queued'))}</strong>
+        <button class="chip-btn danger-chip-btn" type="button" data-delete-history="${escapeHtml(item.id || '')}">删除</button>
+      </div>
+      <div class="history-item-message">${escapeHtml(item.resultMessage || '任务已进入流程，等待设备后续反馈。')}</div>
       <small>任务ID: ${escapeHtml(item.id || '--')} · 创建时间: ${escapeHtml(item.createdAt || '--')}${item.dispatchedAt ? ` · 最近投递: ${escapeHtml(item.dispatchedAt)}` : ''}${item.processingAt ? ` · 开始处理: ${escapeHtml(item.processingAt)}` : ''}${item.executedAt ? ` · 完成时间: ${escapeHtml(item.executedAt)}` : ''}</small>
     </div>
   `).join('');
@@ -240,8 +257,8 @@ function commandSectionMeta(section) {
 function renderSectionLauncherGrid(device) {
   const items = [
     { key: 'alarm', title: '闹钟管理', desc: `${(device.scheduledAlarms || []).length} 条计划 / ${(device.activeAlarms || []).length} 条活跃` },
-    { key: 'piano', title: '钢琴与旋律', desc: '播放单音或触发已保存旋律' },
-    { key: 'storage', title: 'LittleFS 存储', desc: '远程写入文本文件或删除文件' },
+    { key: 'piano', title: '钢琴与旋律', desc: `${(device.availableMelodies || []).length || 0} 条已知旋律，可播放单音或旋律` },
+    { key: 'storage', title: 'LittleFS 存储', desc: `${(device.storageFiles || []).length || 0} 个已知文件，可远程写入或删除` },
     { key: 'pin', title: '引脚激活', desc: '定时拉高、保持开启、立即关闭' }
   ];
 
@@ -277,13 +294,15 @@ function renderAlarmModal(device) {
         <label><span>持续秒数</span><input name="duration" type="number" min="0" max="86400" value="5"></label>
         <button class="primary-btn" type="submit">加入闹钟任务</button>
       </form>
+      <div class="hint-box compact-hint">设备端实际支持的计划格式是 <code>HH:MM:SS|buzzer</code> 或 <code>HH:MM:SS|pin|引脚|持续秒数</code>，这里已经按那个格式帮你转换。</div>
       <button class="ghost-btn modal-clear-alarms-btn" type="button">清空全部闹钟</button>
     </div>
   `;
 }
 
-function renderPianoModal() {
+function renderPianoModal(device) {
   const notes = ['C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
+  const melodies = Array.isArray(device.availableMelodies) ? device.availableMelodies : [];
   return `
     <div class="modal-stack">
       <form class="piano-note-form field-grid">
@@ -291,6 +310,17 @@ function renderPianoModal() {
         <label><span>持续毫秒</span><input name="durationMs" type="number" min="50" max="20000" value="500"></label>
         <button class="primary-btn" type="submit">加入单音任务</button>
       </form>
+      <div class="sub-card">
+        <h5>已知旋律</h5>
+        <div class="quick-choice-grid">
+          ${melodies.length > 0 ? melodies.map(melody => `
+            <button class="quick-choice-btn" type="button" data-play-melody="${escapeHtml(melody.name || '')}">
+              <span class="quick-choice-title">${escapeHtml(melody.name || '--')}</span>
+              <span class="quick-choice-desc">${melody.isPreset ? '设备预设旋律' : '设备上报旋律'}</span>
+            </button>
+          `).join('') : '<div class="empty-line">设备这次心跳还没有上报旋律列表，仍然可以手动输入旋律名。</div>'}
+        </div>
+      </div>
       <form class="piano-melody-form stack-form compact-stack">
         <label><span>旋律名称</span><input name="name" type="text" placeholder="例如 经典闹钟"></label>
         <button class="secondary-btn" type="submit">加入旋律播放任务</button>
@@ -300,9 +330,27 @@ function renderPianoModal() {
   `;
 }
 
-function renderStorageModal() {
+function renderStorageModal(device) {
+  const files = Array.isArray(device.storageFiles) ? device.storageFiles : [];
   return `
     <div class="modal-stack">
+      <div class="sub-card">
+        <h5>设备已知文件</h5>
+        <div class="known-file-list">
+          ${files.length > 0 ? files.map(file => `
+            <div class="known-file-row">
+              <div>
+                <div class="known-file-name">${escapeHtml(file.name || '--')}${file.hasPassword ? ' · 已设密码' : ''}</div>
+                <div class="known-file-meta">${escapeHtml(formatFileSize(file.size || 0))}</div>
+              </div>
+              <div class="known-file-actions">
+                <button class="chip-btn" type="button" data-fill-write-file="${escapeHtml(file.name || '')}">写入这个文件</button>
+                <button class="chip-btn danger-chip-btn" type="button" data-delete-file="${escapeHtml(file.name || '')}">删除</button>
+              </div>
+            </div>
+          `).join('') : '<div class="empty-line">设备这次心跳还没有上报文件列表，仍然可以手动填写文件名。</div>'}
+        </div>
+      </div>
       <form class="storage-write-form stack-form">
         <label><span>文件名</span><input name="fileName" type="text" placeholder="memo.txt"></label>
         <label><span>文本内容</span><textarea name="content" rows="8" placeholder="输入要写入 LittleFS 的内容"></textarea></label>
@@ -322,8 +370,8 @@ function renderPinModal() {
 
 function renderCommandModalContent(device, section) {
   if (section === 'alarm') return renderAlarmModal(device);
-  if (section === 'piano') return renderPianoModal();
-  if (section === 'storage') return renderStorageModal();
+  if (section === 'piano') return renderPianoModal(device);
+  if (section === 'storage') return renderStorageModal(device);
   return renderPinModal();
 }
 
@@ -347,6 +395,22 @@ async function cancelAllTasks(serial) {
     method: 'DELETE'
   });
   showToast(data.message || '任务已全部取消');
+  await loadDevices({ refreshModal: true });
+}
+
+async function deleteHistoryEntry(serial, taskId) {
+  const data = await request(`/api/admin/devices/${encodeURIComponent(serial)}/history/${encodeURIComponent(taskId)}`, {
+    method: 'DELETE'
+  });
+  showToast(data.message || '执行记录已删除');
+  await loadDevices({ refreshModal: true });
+}
+
+async function clearHistory(serial) {
+  const data = await request(`/api/admin/devices/${encodeURIComponent(serial)}/history`, {
+    method: 'DELETE'
+  });
+  showToast(data.message || '执行记录已清空');
   await loadDevices({ refreshModal: true });
 }
 
@@ -424,6 +488,8 @@ function bindModalSectionEvents(device, section) {
   }
 
   if (section === 'piano') {
+    const melodyInput = root.querySelector('.piano-melody-form input[name="name"]');
+
     root.querySelector('.piano-note-form')?.addEventListener('submit', async event => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
@@ -448,10 +514,26 @@ function bindModalSectionEvents(device, section) {
         showToast(error.message);
       }
     });
+
+    root.querySelectorAll('[data-play-melody]').forEach(button => {
+      button.addEventListener('click', async () => {
+        const name = String(button.dataset.playMelody || '').trim();
+        if (!name) return;
+        if (melodyInput) melodyInput.value = name;
+        try {
+          await sendCommand(device.serial, 'piano_play_melody', { name });
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+    });
     return;
   }
 
   if (section === 'storage') {
+    const writeFileInput = root.querySelector('.storage-write-form input[name="fileName"]');
+    const deleteFileInput = root.querySelector('.storage-delete-form input[name="fileName"]');
+
     root.querySelector('.storage-write-form')?.addEventListener('submit', async event => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
@@ -477,6 +559,28 @@ function bindModalSectionEvents(device, section) {
         showToast(error.message);
       }
     });
+
+    root.querySelectorAll('[data-fill-write-file]').forEach(button => {
+      button.addEventListener('click', () => {
+        const fileName = String(button.dataset.fillWriteFile || '').trim();
+        if (writeFileInput) writeFileInput.value = fileName;
+        if (deleteFileInput) deleteFileInput.value = fileName;
+      });
+    });
+
+    root.querySelectorAll('[data-delete-file]').forEach(button => {
+      button.addEventListener('click', async () => {
+        const fileName = String(button.dataset.deleteFile || '').trim();
+        if (!fileName) return;
+        if (!window.confirm(`确定要删除文件 ${fileName} 吗？`)) return;
+        if (deleteFileInput) deleteFileInput.value = fileName;
+        try {
+          await sendCommand(device.serial, 'storage_delete_file', { fileName });
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+    });
     return;
   }
 
@@ -497,20 +601,22 @@ function bindModalSectionEvents(device, section) {
 }
 
 function openCommandModal(device, section) {
+  const latestDevice = getStateDevice(device.serial) || device;
   const meta = commandSectionMeta(section);
-  state.currentModal = { serial: device.serial, section };
+  state.currentModal = { serial: latestDevice.serial, section };
   els.commandModalTag.textContent = meta.tag;
-  els.commandModalTitle.textContent = `${device.alias || device.serial} · ${meta.title}`;
+  els.commandModalTitle.textContent = `${latestDevice.alias || latestDevice.serial} · ${meta.title}`;
   els.commandModalSubtitle.textContent = meta.subtitle;
-  els.commandModalBody.innerHTML = renderCommandModalContent(device, section);
+  els.commandModalBody.innerHTML = renderCommandModalContent(latestDevice, section);
   els.commandModal.classList.remove('hidden');
   els.commandModal.setAttribute('aria-hidden', 'false');
-  bindModalSectionEvents(device, section);
+  bindModalSectionEvents(latestDevice, section);
 }
 
 function createDeviceCardMarkup(device) {
   const isOpen = state.openCards.has(device.serial);
   const queueCount = Number(device.pendingQueueCount || 0);
+  const historyCount = getVisibleHistoryEntries(device.commandHistory).length;
   const onlineText = device.online ? '设备在线' : '设备离线';
   const queueText = queueCount > 0 ? `${queueCount} 条待执行任务` : '当前没有待执行任务';
   const wifiName = device.wifiSsid || '未连接 WiFi';
@@ -532,7 +638,7 @@ function createDeviceCardMarkup(device) {
 
   return `
     <article class="device-card" data-serial="${escapeHtml(device.serial)}">
-      <button class="device-card-head" type="button">
+      <div class="device-card-head" role="button" tabindex="0" aria-expanded="${isOpen ? 'true' : 'false'}">
         <div class="device-head-main">
           <div class="device-head-top">
             <span class="status-pill ${device.online ? 'online' : 'offline'}">${onlineText}</span>
@@ -558,7 +664,7 @@ function createDeviceCardMarkup(device) {
           </div>
           <span class="device-toggle">${isOpen ? '收起详情' : '展开详情'}</span>
         </div>
-      </button>
+      </div>
       <div class="device-card-body ${isOpen ? '' : 'hidden'}">
         <div class="device-info-grid">${infoTiles}</div>
         <div class="device-sections">
@@ -580,7 +686,13 @@ function createDeviceCardMarkup(device) {
             <div class="history-list">${renderPendingTasks(device)}</div>
           </section>
           <section class="device-section history-box">
-            <div class="history-head"><div><div class="section-tag">执行记录</div><h4>最近任务记录</h4></div><span class="history-tip">任务完成后会从队列删除，并保留在这里。</span></div>
+            <div class="history-head">
+              <div><div class="section-tag">执行记录</div><h4>最近任务记录</h4></div>
+              <div class="history-toolbar">
+                <span class="history-tip">任务完成后会从队列删除，并保留在这里。</span>
+                <button class="ghost-btn history-clear-btn" type="button" data-clear-history="1" ${historyCount > 0 ? '' : 'disabled'}>清空记录</button>
+              </div>
+            </div>
             <div class="history-list">${renderHistory(device.commandHistory)}</div>
           </section>
         </div>
@@ -604,15 +716,25 @@ function bindDeviceCardEvents(card, device) {
   const body = card.querySelector('.device-card-body');
   const toggleText = card.querySelector('.device-toggle');
 
-  head.addEventListener('click', () => {
+  const toggleCard = () => {
     if (state.openCards.has(device.serial)) {
       state.openCards.delete(device.serial);
       body.classList.add('hidden');
-      toggleText.textContent = '展开';
+      toggleText.textContent = '展开详情';
+      head.setAttribute('aria-expanded', 'false');
     } else {
       state.openCards.add(device.serial);
       body.classList.remove('hidden');
-      toggleText.textContent = '收起';
+      toggleText.textContent = '收起详情';
+      head.setAttribute('aria-expanded', 'true');
+    }
+  };
+
+  head.addEventListener('click', toggleCard);
+  head.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleCard();
     }
   });
 
@@ -634,6 +756,30 @@ function bindDeviceCardEvents(card, device) {
         showToast(error.message);
       }
     });
+  });
+
+  card.querySelectorAll('[data-delete-history]').forEach(button => {
+    button.addEventListener('click', async event => {
+      event.stopPropagation();
+      const taskId = button.dataset.deleteHistory;
+      if (!taskId) return;
+      if (!window.confirm(`确定要删除执行记录 ${taskId} 吗？`)) return;
+      try {
+        await deleteHistoryEntry(device.serial, taskId);
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+  });
+
+  card.querySelector('[data-clear-history]')?.addEventListener('click', async event => {
+    event.stopPropagation();
+    if (!window.confirm('确定要清空这个设备的执行记录吗？待执行任务不会被删除。')) return;
+    try {
+      await clearHistory(device.serial);
+    } catch (error) {
+      showToast(error.message);
+    }
   });
 
   card.querySelector('[data-clear-all-tasks]')?.addEventListener('click', async event => {

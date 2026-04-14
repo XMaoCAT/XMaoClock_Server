@@ -120,7 +120,8 @@ body::after {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -129,7 +130,8 @@ button {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   padding: 14px 16px;
   border-radius: 18px;
@@ -140,12 +142,14 @@ select {
 }
 
 :root[data-theme="dark"] input,
-:root[data-theme="dark"] select {
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
   background: rgba(12, 18, 30, 0.42);
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--line-strong);
 }
 
@@ -486,11 +490,14 @@ select:focus {
   background: linear-gradient(135deg, rgba(77, 166, 255, 0.12), rgba(255, 255, 255, 0.04));
   color: inherit;
   text-align: left;
+  cursor: pointer;
+  user-select: none;
   transition: transform 220ms cubic-bezier(0.25, 1, 0.5, 1), opacity 220ms cubic-bezier(0.25, 1, 0.5, 1);
   will-change: transform, opacity;
 }
 
 .device-card-head:hover,
+.quick-choice-btn:hover,
 .primary-btn:hover,
 .secondary-btn:hover,
 .ghost-btn:hover,
@@ -500,6 +507,13 @@ select:focus {
 .mini-chip:hover {
   transform: translate3d(0, -2px, 0);
   opacity: 0.96;
+}
+
+.device-card-head:focus-visible,
+.section-launcher-btn:focus-visible,
+.quick-choice-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .device-head-main,
@@ -779,12 +793,18 @@ select:focus {
   padding: 16px;
 }
 
+.history-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .history-item strong {
-  display: block;
   font-size: 0.98rem;
 }
 
-.history-item div,
+.history-item > div:not(.history-item-head),
 .history-item small {
   display: block;
   margin-top: 8px;
@@ -802,6 +822,14 @@ select:focus {
 
 .history-tip {
   font-size: 0.88rem;
+}
+
+.history-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
 }
 
 .primary-btn,
@@ -839,6 +867,11 @@ select:focus {
   background: rgba(255, 255, 255, 0.36);
 }
 
+:root[data-theme="dark"] .secondary-btn {
+  background: rgba(25, 39, 59, 0.86);
+  color: #e6f0ff;
+}
+
 .ghost-btn,
 .chip-btn,
 .tool-chip {
@@ -846,11 +879,25 @@ select:focus {
   border: 1px solid var(--line);
 }
 
+:root[data-theme="dark"] .ghost-btn,
+:root[data-theme="dark"] .chip-btn,
+:root[data-theme="dark"] .tool-chip {
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .ghost-btn.active,
 .tool-chip.active {
   background: var(--accent-soft);
   color: var(--accent);
   border-color: rgba(77, 166, 255, 0.2);
+}
+
+.ghost-btn:disabled,
+.chip-btn:disabled,
+.danger-ghost-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 .danger-ghost-btn {
@@ -1042,6 +1089,85 @@ select:focus {
   line-height: 1.5;
 }
 
+.compact-hint {
+  padding: 14px 16px;
+  border-radius: 20px;
+}
+
+.quick-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.quick-choice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 96px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.76), rgba(255,255,255,0.5));
+  color: var(--text);
+  text-align: left;
+  box-shadow: var(--panel-shadow);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+:root[data-theme="dark"] .quick-choice-btn {
+  background: linear-gradient(180deg, rgba(20, 33, 52, 0.94), rgba(11, 19, 31, 0.82));
+}
+
+.quick-choice-title {
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.quick-choice-desc {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.known-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.known-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+:root[data-theme="dark"] .known-file-row {
+  background: rgba(12, 20, 32, 0.62);
+}
+
+.known-file-name {
+  font-weight: 700;
+}
+
+.known-file-meta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.known-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1116,6 +1242,17 @@ select:focus {
 
   .modal-head {
     flex-direction: column;
+  }
+
+  .known-file-row,
+  .history-item-head,
+  .history-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .known-file-actions {
+    justify-content: stretch;
   }
 }
 

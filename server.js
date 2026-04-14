@@ -152,6 +152,56 @@ function sanitizeRgbState(input) {
   };
 }
 
+function sanitizeMelodyCatalog(input) {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  const seen = new Set();
+  return input
+    .slice(0, 24)
+    .map(item => {
+      const raw = typeof item === 'string' ? { name: item } : (item || {});
+      const name = String(raw.name || '').trim().slice(0, 64);
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) {
+        return null;
+      }
+      seen.add(key);
+      return {
+        name,
+        isPreset: !!raw.isPreset
+      };
+    })
+    .filter(Boolean);
+}
+
+function sanitizeStorageFiles(input) {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  const seen = new Set();
+  return input
+    .slice(0, 32)
+    .map(item => {
+      const entry = item || {};
+      const name = String(entry.name || '').trim();
+      const key = name.toLowerCase();
+      if (!isSafeStorageFileName(name) || seen.has(key)) {
+        return null;
+      }
+      seen.add(key);
+      return {
+        name,
+        size: clamp(entry.size, 0, Number.MAX_SAFE_INTEGER, 0),
+        hasPassword: !!entry.hasPassword
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+}
+
 function sanitizeTask(task) {
   return {
     id: String(task && task.id ? task.id : '').trim(),
@@ -197,6 +247,8 @@ function sanitizeDevice(device) {
     bootAnimationType: clamp(device.bootAnimationType, 1, 2, 1),
     canvasDisplayActive: !!device.canvasDisplayActive,
     canvasDisplayDuration: clamp(device.canvasDisplayDuration, 0, 86400, 0),
+    availableMelodies: sanitizeMelodyCatalog(device.availableMelodies),
+    storageFiles: sanitizeStorageFiles(device.storageFiles),
     pendingQueueCount: pendingTasks.length,
     pendingTasks,
     commandHistory: Array.isArray(device.commandHistory) ? device.commandHistory.slice(0, 12) : []
@@ -397,6 +449,8 @@ function getOrCreateDevice(serial, alias) {
       bootAnimationType: 1,
       canvasDisplayActive: false,
       canvasDisplayDuration: 0,
+      availableMelodies: [],
+      storageFiles: [],
       deviceToken: '',
       pendingQueue: [],
       commandHistory: []
@@ -409,6 +463,8 @@ function getOrCreateDevice(serial, alias) {
   device.bootAnimationType = clamp(device.bootAnimationType, 1, 2, 1);
   device.canvasDisplayActive = !!device.canvasDisplayActive;
   device.canvasDisplayDuration = clamp(device.canvasDisplayDuration, 0, 86400, 0);
+  device.availableMelodies = sanitizeMelodyCatalog(device.availableMelodies);
+  device.storageFiles = sanitizeStorageFiles(device.storageFiles);
   device.pendingQueue = Array.isArray(device.pendingQueue)
     ? device.pendingQueue.map(id => String(id || '').trim()).filter(Boolean)
     : [];
@@ -688,6 +744,38 @@ function cancelAllTasks(device) {
   return tasks.length;
 }
 
+function deleteHistoryEntry(device, taskId) {
+  const normalizedId = String(taskId || '').trim();
+  if (!normalizedId) {
+    return { ok: false, code: 400, message: '缺少要删除的记录 ID' };
+  }
+
+  const task = findTaskById(normalizedId);
+  if (task && normalizeSerial(task.serial) === device.serial) {
+    return { ok: false, code: 409, message: '这条任务仍在待执行队列中，请先取消任务再删除记录' };
+  }
+
+  const before = Array.isArray(device.commandHistory) ? device.commandHistory.length : 0;
+  device.commandHistory = (device.commandHistory || []).filter(item => String(item && item.id ? item.id : '').trim() !== normalizedId);
+  if (device.commandHistory.length === before) {
+    return { ok: false, code: 404, message: '未找到要删除的执行记录' };
+  }
+
+  saveStore();
+  return { ok: true, count: 1 };
+}
+
+function clearHistoryEntries(device) {
+  const pendingIds = new Set(getTasksForDevice(device.serial).map(task => task.id));
+  const before = Array.isArray(device.commandHistory) ? device.commandHistory.length : 0;
+  device.commandHistory = (device.commandHistory || []).filter(item => pendingIds.has(String(item && item.id ? item.id : '').trim()));
+  const removed = before - device.commandHistory.length;
+  if (removed > 0) {
+    saveStore();
+  }
+  return removed;
+}
+
 function applyCommandResults(device, resultsInput) {
   const results = parseResultsInput(resultsInput);
   let touched = false;
@@ -773,6 +861,8 @@ function updateDeviceHeartbeat(device, payload) {
   device.bootAnimationType = clamp(payload.bootAnimationType, 1, 2, 1);
   device.canvasDisplayActive = !!payload.canvasDisplayActive;
   device.canvasDisplayDuration = clamp(payload.canvasDisplayDuration, 0, 86400, 0);
+  device.availableMelodies = sanitizeMelodyCatalog(payload.availableMelodies);
+  device.storageFiles = sanitizeStorageFiles(payload.storageFiles);
 
   const sensor = payload.sensor || {};
   if (sensor && sensor.available) {
@@ -1118,6 +1208,41 @@ function handleAdminCancelAllTasks(req, res, params) {
   sendJson(res, 200, { status: 'success', message: count > 0 ? `已取消 ${count} 条任务` : '当前没有待取消的任务' });
 }
 
+function handleAdminDeleteHistoryEntry(req, res, params) {
+  if (!requireAdmin(req, res)) {
+    return;
+  }
+
+  const device = getDeviceBySerial(params.serial);
+  if (!device) {
+    sendJson(res, 404, { status: 'error', message: '未找到该设备' });
+    return;
+  }
+
+  const result = deleteHistoryEntry(device, params.taskId);
+  if (!result.ok) {
+    sendJson(res, result.code || 400, { status: 'error', message: result.message });
+    return;
+  }
+
+  sendJson(res, 200, { status: 'success', message: '执行记录已删除' });
+}
+
+function handleAdminClearHistory(req, res, params) {
+  if (!requireAdmin(req, res)) {
+    return;
+  }
+
+  const device = getDeviceBySerial(params.serial);
+  if (!device) {
+    sendJson(res, 404, { status: 'error', message: '未找到该设备' });
+    return;
+  }
+
+  const count = clearHistoryEntries(device);
+  sendJson(res, 200, { status: 'success', message: count > 0 ? `已删除 ${count} 条执行记录` : '当前没有可删除的执行记录' });
+}
+
 function handleAdminDeleteDevice(req, res, params) {
   if (!requireAdmin(req, res)) {
     return;
@@ -1404,6 +1529,18 @@ async function routeRequest(req, res) {
   params = matchRoute(pathname, '/api/admin/devices/:serial/tasks');
   if (req.method === 'DELETE' && params) {
     handleAdminCancelAllTasks(req, res, params);
+    return;
+  }
+
+  params = matchRoute(pathname, '/api/admin/devices/:serial/history/:taskId');
+  if (req.method === 'DELETE' && params) {
+    handleAdminDeleteHistoryEntry(req, res, params);
+    return;
+  }
+
+  params = matchRoute(pathname, '/api/admin/devices/:serial/history');
+  if (req.method === 'DELETE' && params) {
+    handleAdminClearHistory(req, res, params);
     return;
   }
 

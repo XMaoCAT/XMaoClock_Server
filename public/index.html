@@ -54,7 +54,7 @@
       <section class="auth-card hidden" id="login-panel">
         <div class="section-tag">登录后台</div>
         <h2>输入密码进入管理页面</h2>
-        <p>登录后就能看到设备状态、等待回执的命令，以及闹钟、画板、灯光和 GPIO 等远程控制功能。</p>
+        <p>登录后就能看到设备状态、等待回执的命令，以及闹钟、钢琴、存储和引脚激活这四类远程控制功能。</p>
         <form id="login-form" class="stack-form auth-form">
           <label>
             <span>管理员密码</span>
@@ -126,7 +126,7 @@
               <div class="workflow-row"><span>1</span><p>在这里录入设备串号和备注名称</p></div>
               <div class="workflow-row"><span>2</span><p>打开设备本地页面，填写公网域名或公网 IP</p></div>
               <div class="workflow-row"><span>3</span><p>等待设备心跳后上线，在线状态会自动刷新</p></div>
-              <div class="workflow-row"><span>4</span><p>点开设备卡片，直接操作闹钟、画板、灯光和更多功能</p></div>
+              <div class="workflow-row"><span>4</span><p>点开设备卡片，在弹窗里操作闹钟、钢琴、存储和引脚激活</p></div>
             </div>
           </section>
         </div>
@@ -139,6 +139,20 @@
 
   <template id="device-card-template"><div></div></template>
   <div class="toast" id="toast"></div>
+  <div class="modal-overlay hidden" id="command-modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="1"></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="command-modal-title">
+      <div class="modal-head">
+        <div>
+          <div class="section-tag" id="command-modal-tag">远程控制</div>
+          <h3 id="command-modal-title">控制面板</h3>
+          <p id="command-modal-subtitle">请选择要发送的远程指令。</p>
+        </div>
+        <button class="ghost-btn modal-close-btn" id="command-modal-close" type="button">关闭</button>
+      </div>
+      <div class="modal-body" id="command-modal-body"></div>
+    </section>
+  </div>
   <script src="/app.js"></script>
 </body>
 </html>
