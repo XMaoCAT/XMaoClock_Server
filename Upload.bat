@@ -7,15 +7,15 @@ set "REMOTE_URL=ssh://git@ssh.github.com:443/XMaoCAT/XMaoClock_Server.git"
 
 where git >nul 2>nul
 if errorlevel 1 (
-  echo [Upload] 未找到 git，请先安装 Git for Windows。
+  echo [Upload] Git for Windows was not found.
   exit /b 1
 )
 
 if not exist ".git" (
-  echo [Upload] 当前目录还不是 git 仓库，正在初始化...
+  echo [Upload] Initializing git repository...
   git init
   if errorlevel 1 (
-    echo [Upload] git init 失败。
+    echo [Upload] git init failed.
     exit /b 1
   )
 )
@@ -36,30 +36,30 @@ if "%COMMIT_MSG%"=="" (
 
 git add -A
 if errorlevel 1 (
-  echo [Upload] git add 失败。
+  echo [Upload] git add failed.
   exit /b 1
 )
 
 git diff --cached --quiet
 if not errorlevel 1 (
-  echo [Upload] 当前没有新的改动，直接检查远程同步。
+  echo [Upload] No new changes to commit. Checking remote sync only.
   goto push_now
 )
 
-echo [Upload] 正在提交改动...
+echo [Upload] Creating commit...
 git commit -m "%COMMIT_MSG%"
 if errorlevel 1 (
-  echo [Upload] git commit 失败。
+  echo [Upload] git commit failed.
   exit /b 1
 )
 
 :push_now
-echo [Upload] 正在通过 SSH 推送到 GitHub...
+echo [Upload] Pushing to GitHub over SSH...
 git push -u origin main
 if errorlevel 1 (
-  echo [Upload] 推送失败，请检查 SSH Key、网络或仓库权限。
+  echo [Upload] Push failed. Check SSH keys, network, or repository access.
   exit /b 1
 )
 
-echo [Upload] 推送完成。
+echo [Upload] Push completed.
 exit /b 0
