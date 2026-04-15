@@ -62,6 +62,38 @@ if errorlevel 1 (
 )
 
 :push_now
+echo [Upload] Checking remote updates...
+git fetch origin main --quiet
+if errorlevel 1 (
+  echo [Upload] Failed to fetch remote branch state.
+  set "UPLOAD_EXIT_CODE=1"
+  goto finish
+)
+
+set "LOCAL_AHEAD=0"
+set "REMOTE_AHEAD=0"
+for /f "tokens=1,2" %%A in ('git rev-list --left-right --count HEAD...origin/main') do (
+  set "LOCAL_AHEAD=%%A"
+  set "REMOTE_AHEAD=%%B"
+)
+
+if not "%REMOTE_AHEAD%"=="0" (
+  if "%LOCAL_AHEAD%"=="0" (
+    echo [Upload] Remote has newer commits. Fast-forwarding local branch...
+    git merge --ff-only origin/main
+    if errorlevel 1 (
+      echo [Upload] Fast-forward sync failed.
+      set "UPLOAD_EXIT_CODE=1"
+      goto finish
+    )
+  ) else (
+    echo [Upload] Local and remote both contain new commits.
+    echo [Upload] Please sync this repository manually before pushing again.
+    set "UPLOAD_EXIT_CODE=1"
+    goto finish
+  )
+)
+
 echo [Upload] Pushing to GitHub over SSH...
 git push -u origin main
 if errorlevel 1 (
