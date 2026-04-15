@@ -184,7 +184,7 @@ function renderPendingTasks(device) {
   return tasks.map(task => `
     <div class="history-item ${escapeHtml(task.status || '')}">
       <strong>${escapeHtml(commandTypeLabel(task.type))} · ${escapeHtml(commandStatusLabel(task.status || 'queued'))}</strong>
-      <div>${escapeHtml(task.resultMessage || '等待设备通过任务 API 拉取。')}</div>
+      <div>${escapeHtml(task.resultMessage || '等待设备访问 /command.json 拉取。')}</div>
       <small>任务ID: ${escapeHtml(task.id || '--')} · 创建时间: ${escapeHtml(task.createdAt || '--')}${task.dispatchedAt ? ` · 最近投递: ${escapeHtml(task.dispatchedAt)}` : ''}${task.processingAt ? ` · 开始处理: ${escapeHtml(task.processingAt)}` : ''}</small>
       <div class="task-action-row"><button class="chip-btn danger-chip-btn" type="button" data-cancel-task="${escapeHtml(task.id || '')}">取消这条任务</button></div>
     </div>
@@ -660,7 +660,7 @@ function createDeviceCardMarkup(device) {
           <div class="signal-stack">
             <span>局域网地址</span>
             <strong class="mono">${escapeHtml(device.wifiIp || '--')}</strong>
-            <small>${device.online ? '设备会定时上报状态，并通过 GET 任务 API 拉取待执行任务' : '设备离线时，任务会继续保留在 tasks.json 队列中'}</small>
+            <small>${device.online ? '设备会定时上报状态，并通过 /command.json 拉取待执行任务' : '设备离线时，任务会继续保留在 tasks.json 队列中'}</small>
           </div>
           <span class="device-toggle">${isOpen ? '收起详情' : '展开详情'}</span>
         </div>

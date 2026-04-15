@@ -559,21 +559,25 @@ function buildDispatchCommands(device) {
   const dispatchedAt = nowIso();
 
   return getTasksForDevice(device.serial)
-    .filter(shouldDispatchCommand)
-    .slice(0, 1)
     .map(command => {
-      command.status = 'sent';
-      command.dispatchedAt = dispatchedAt;
-      command.deliveryAttempts = Number(command.deliveryAttempts || 0) + 1;
-      command.resultMessage = command.deliveryAttempts > 1
-        ? '设备尚未确认开始执行，服务器已重新投递该任务'
-        : '任务已投递，等待设备确认开始执行';
+      if (command.status === 'queued') {
+        command.status = 'sent';
+        command.dispatchedAt = dispatchedAt;
+        command.deliveryAttempts = Number(command.deliveryAttempts || 0) + 1;
+        command.resultMessage = command.deliveryAttempts > 1
+          ? '设备尚未确认开始执行，服务器已重新投递该任务'
+          : '任务已投递，等待设备确认开始执行';
+      }
       const historyItem = findCommand(device, command.id);
       if (historyItem) {
-        historyItem.status = 'sent';
-        historyItem.dispatchedAt = dispatchedAt;
-        historyItem.deliveryAttempts = command.deliveryAttempts;
-        historyItem.resultMessage = command.resultMessage;
+        historyItem.status = command.status;
+        if (command.dispatchedAt) {
+          historyItem.dispatchedAt = command.dispatchedAt;
+        }
+        historyItem.deliveryAttempts = Number(command.deliveryAttempts || 0);
+        if (command.resultMessage) {
+          historyItem.resultMessage = command.resultMessage;
+        }
       }
       return {
         id: command.id,
@@ -1170,7 +1174,7 @@ async function handleAdminCommand(req, res, params) {
     `已为设备 ${device.serial} 加入远程任务`,
     `type=${queued.type} taskId=${queued.id} alias=${previewText(device.alias, 40)}`
   );
-  sendJson(res, 200, { status: 'success', message: '任务已加入 tasks.json 队列，等待设备通过任务 API 拉取', command: queued });
+  sendJson(res, 200, { status: 'success', message: '任务已加入 tasks.json 队列，等待设备访问 /command.json 拉取', command: queued });
 }
 
 function handleAdminCancelTask(req, res, params) {
@@ -1353,7 +1357,8 @@ async function handleDeviceHeartbeat(req, res) {
   sendJson(res, 200, {
     status: 'success',
     message: '云端在线，等待下一次任务同步',
-    pollIntervalMs: clamp(config.devicePollIntervalMs, 5000, 60000, 8000)
+    pollIntervalMs: clamp(config.devicePollIntervalMs, 5000, 60000, 8000),
+    commandApi: '/command.json'
   });
 }
 
@@ -1372,7 +1377,8 @@ function validateDeviceToken(serial, token, res) {
   return device;
 }
 
-function handleDeviceTaskFetch(req, res, requestUrl) {
+function handleDeviceTaskFetch(req, res, requestUrl, options = {}) {
+  const routeLabel = String(options.routeLabel || '/api/device/tasks');
   const serial = normalizeSerial(requestUrl.searchParams.get('serial') || '');
   const token = String(requestUrl.searchParams.get('deviceToken') || '').trim();
   if (!serial || !token) {
@@ -1390,17 +1396,18 @@ function handleDeviceTaskFetch(req, res, requestUrl) {
   saveTaskStore();
   saveStore();
 
-  if (tasks.length > 0) {
-    logEvent(
-      'TaskFetch',
-      `设备 ${device.serial} 拉取到 ${tasks.length} 条任务`,
-      tasks.map(task => `${task.type}:${task.id}`).join(', ')
-    );
-  }
+  logEvent(
+    'TaskFetch',
+    `设备 ${device.serial} 访问 ${routeLabel}`,
+    tasks.length > 0
+      ? `tasks=${tasks.length} ${tasks.map(task => `${task.type}:${task.id}`).join(', ')}`
+      : 'tasks=0'
+  );
 
   sendJson(res, 200, {
     status: 'success',
     tasks,
+    commands: tasks,
     pollIntervalMs: clamp(config.devicePollIntervalMs, 5000, 60000, 8000),
     message: tasks.length > 0 ? '已返回待执行任务' : '当前没有待执行任务'
   });
@@ -1561,7 +1568,12 @@ async function routeRequest(req, res) {
   }
 
   if (req.method === 'GET' && pathname === '/api/device/tasks') {
-    handleDeviceTaskFetch(req, res, requestUrl);
+    handleDeviceTaskFetch(req, res, requestUrl, { routeLabel: '/api/device/tasks' });
+    return;
+  }
+
+  if (req.method === 'GET' && pathname === '/command.json') {
+    handleDeviceTaskFetch(req, res, requestUrl, { routeLabel: '/command.json' });
     return;
   }
 
@@ -1612,4 +1624,3 @@ server.listen(config.port, config.host, () => {
   console.log(`[RemotePlatform] Open http://127.0.0.1:${config.port} on this server to complete setup`);
   console.log(`[RemotePlatform] Listening on ${config.host}:${config.port}`);
 });
-
