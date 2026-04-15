@@ -1,6 +1,10 @@
 @echo off
 setlocal EnableExtensions
 
+set "UPLOAD_EXIT_CODE=0"
+set "UPLOAD_PAUSE=1"
+if /I "%UPLOAD_NO_PAUSE%"=="1" set "UPLOAD_PAUSE=0"
+
 cd /d "%~dp0"
 
 set "REMOTE_URL=ssh://git@ssh.github.com:443/XMaoCAT/XMaoClock_Server.git"
@@ -8,7 +12,8 @@ set "REMOTE_URL=ssh://git@ssh.github.com:443/XMaoCAT/XMaoClock_Server.git"
 where git >nul 2>nul
 if errorlevel 1 (
   echo [Upload] Git for Windows was not found.
-  exit /b 1
+  set "UPLOAD_EXIT_CODE=1"
+  goto finish
 )
 
 if not exist ".git" (
@@ -16,7 +21,8 @@ if not exist ".git" (
   git init
   if errorlevel 1 (
     echo [Upload] git init failed.
-    exit /b 1
+    set "UPLOAD_EXIT_CODE=1"
+    goto finish
   )
 )
 
@@ -37,7 +43,8 @@ if "%COMMIT_MSG%"=="" (
 git add -A
 if errorlevel 1 (
   echo [Upload] git add failed.
-  exit /b 1
+  set "UPLOAD_EXIT_CODE=1"
+  goto finish
 )
 
 git diff --cached --quiet
@@ -50,7 +57,8 @@ echo [Upload] Creating commit...
 git commit -m "%COMMIT_MSG%"
 if errorlevel 1 (
   echo [Upload] git commit failed.
-  exit /b 1
+  set "UPLOAD_EXIT_CODE=1"
+  goto finish
 )
 
 :push_now
@@ -58,8 +66,20 @@ echo [Upload] Pushing to GitHub over SSH...
 git push -u origin main
 if errorlevel 1 (
   echo [Upload] Push failed. Check SSH keys, network, or repository access.
-  exit /b 1
+  set "UPLOAD_EXIT_CODE=1"
+  goto finish
 )
 
 echo [Upload] Push completed.
-exit /b 0
+
+:finish
+if "%UPLOAD_PAUSE%"=="1" (
+  echo.
+  if "%UPLOAD_EXIT_CODE%"=="0" (
+    echo [Upload] Done. Press any key to close this window...
+  ) else (
+    echo [Upload] Finished with errors. Press any key to close this window...
+  )
+  pause >nul
+)
+exit /b %UPLOAD_EXIT_CODE%

@@ -215,6 +215,40 @@ function sanitizeTask(task) {
   };
 }
 
+function buildPublicCommandOverview(serialFilter = '') {
+  const normalizedFilter = normalizeSerial(serialFilter);
+  const devices = Object.values(store.devices || {})
+    .filter(device => !normalizedFilter || normalizeSerial(device && device.serial) === normalizedFilter)
+    .map(device => {
+      const safeDevice = sanitizeDevice(device);
+      const pendingCommands = getTasksForDevice(safeDevice.serial).map(sanitizeTask);
+      return {
+        serial: safeDevice.serial,
+        alias: safeDevice.alias,
+        online: safeDevice.online,
+        lastSeenAt: safeDevice.lastSeenAt,
+        pendingTaskCount: pendingCommands.length,
+        pendingCommands
+      };
+    })
+    .filter(device => normalizedFilter || device.pendingTaskCount > 0)
+    .sort((a, b) => a.serial.localeCompare(b.serial, 'en'));
+
+  const totalPendingTasks = devices.reduce((sum, device) => sum + device.pendingTaskCount, 0);
+  return {
+    status: 'success',
+    mode: 'public-overview',
+    requestedSerial: normalizedFilter,
+    totalDevices: devices.length,
+    totalPendingTasks,
+    generatedAt: nowIso(),
+    message: devices.length > 0
+      ? '这里是当前云端待执行任务总览，设备正式拉取时仍会携带串号和设备令牌'
+      : (normalizedFilter ? '该设备当前没有待执行任务，或设备串号尚未加入公网平台' : '当前没有待执行任务'),
+    devices
+  };
+}
+
 function getTasksForDevice(serial) {
   const normalizedSerial = normalizeSerial(serial);
   return (Array.isArray(taskStore.tasks) ? taskStore.tasks : [])
@@ -1381,8 +1415,20 @@ function handleDeviceTaskFetch(req, res, requestUrl, options = {}) {
   const routeLabel = String(options.routeLabel || '/api/device/tasks');
   const serial = normalizeSerial(requestUrl.searchParams.get('serial') || '');
   const token = String(requestUrl.searchParams.get('deviceToken') || '').trim();
-  if (!serial || !token) {
-    sendJson(res, 400, { status: 'error', message: '缺少串号或设备令牌' });
+
+  if (!token) {
+    const overview = buildPublicCommandOverview(serial);
+    logEvent(
+      'TaskFetchPublic',
+      `浏览器访问 ${routeLabel} 公开总览`,
+      `serial=${serial || 'ALL'} totalPendingTasks=${overview.totalPendingTasks}`
+    );
+    sendJson(res, 200, overview);
+    return;
+  }
+
+  if (!serial) {
+    sendJson(res, 400, { status: 'error', message: '缺少设备串号' });
     return;
   }
 
